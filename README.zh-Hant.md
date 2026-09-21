@@ -22,7 +22,7 @@ https://raw.githubusercontent.com/danielhuang-030/cpa-plugin-codex-selective-pin
 把動態庫放到 CPA 插件目錄（常見為 `plugins/`），或讓商店把 release zip 解到該處：
 
 ```text
-codex-selective-ping_0.1.3_linux_amd64.zip
+codex-selective-ping_0.1.4_linux_amd64.zip
 └── codex-selective-ping.so
 ```
 
@@ -85,7 +85,7 @@ GET/PATCH /v0/management/plugins/codex-selective-ping/config
 - 排程關閉（`schedule_enabled: false`）時，「立刻執行」仍可用，只是每日排程會停。
 - 資源頁語系跟隨 CPA 管理中心（`cli-proxy-language`／`Accept-Language`）。可用 `?lang=zh-Hant|en|ja` 覆蓋。不支援的語系退回繁體中文。本插件不會寫入 CPA 的語系鍵。
 - UI 主題跟隨 CPA（`cli-proxy-theme` 等），可用 `?theme=light|dark` 覆寫；套用 `data-theme` 於 `<html>`。
-- 額度欄（Plan／5h／週限）只顯示宿主提供的值；沒有就顯示「—」。
+- 額度欄（Plan／5h／週限）：Plan 來自 Codex id_token（`chatgpt_plan_type`）。輸入 Management Key 後，頁面會用 CPA `auth-files` + `api-call`（與管理中心相同的 `wham/usage`）補 5h／週限。沒有資料就顯示「—」，不會自己推估；額度只供參考，不影響是否 ping。
 
 ## 參考
 

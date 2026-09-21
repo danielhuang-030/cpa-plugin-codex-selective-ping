@@ -56,14 +56,15 @@ func RenderStatusPage(st StatusResponse, lang Lang) string {
 		if a.Selected {
 			checked = " checked"
 		}
-		fmt.Fprintf(&rows, `<tr>
+		fmt.Fprintf(&rows, `<tr data-auth-index="%s" data-name="%s">
 <td><input type="checkbox" class="acct" data-id="%s"%s></td>
 <td>%s<br><small>%s · %s: %s</small></td>
-<td>%s</td>
-<td class="quota">%s</td>
-<td class="quota">%s</td>
+<td class="quota-plan" data-col="plan">%s</td>
+<td class="quota" data-col="five_hour">%s</td>
+<td class="quota" data-col="weekly">%s</td>
 <td>%s</td>
 </tr>`,
+			html.EscapeString(a.AuthIndex), html.EscapeString(a.Name),
 			html.EscapeString(preferID(a)), checked,
 			html.EscapeString(a.Name), html.EscapeString(a.Email), html.EscapeString(t("auth_index_label")), html.EscapeString(a.AuthIndex),
 			dash(a.Plan),
@@ -343,7 +344,7 @@ async function saveCfg(){
   try{
     const r=await fetch('/v0/management/plugins/codex-selective-ping/config',{method:'PATCH',headers:{'Authorization':'Bearer '+k,'Content-Type':'application/json'},body:JSON.stringify(body)});
     o.textContent=await r.text();
-    if(r.ok) setTimeout(()=>location.reload(),800);
+    if(r.ok){ enrichQuotaFromManagement(); setTimeout(()=>location.reload(),800);} 
   }catch(e){ o.textContent=String(e); }
 }
 async function runNow(){
@@ -353,8 +354,167 @@ async function runNow(){
   try{
     const r=await fetch('/v0/management/plugins/codex-selective-ping/run',{method:'POST',headers:{'Authorization':'Bearer '+k}});
     o.textContent=await r.text();
-    if(r.ok) setTimeout(()=>location.reload(),1500);
+    if(r.ok){ enrichQuotaFromManagement(); setTimeout(()=>location.reload(),1500);} 
   }catch(e){ o.textContent=String(e); }
+}
+function fmtQuotaWindow(w){
+  if(!w) return '—';
+  const parts=[];
+  if(w.remaining!=null && w.remaining!=='') parts.push(('剩/left/残'.split('/')[0])+' '+w.remaining);
+  // Keep labels minimal/numeric; server-rendered i18n already covers first paint.
+  if(w.remaining!=null) parts.push(String(w.remaining));
+  if(w.used!=null) parts.push('used '+w.used);
+  let main = parts.length ? (w.remaining!=null ? String(Number(w.remaining).toPrecision(4)).replace(/\.?0+$/,'') : ('used '+w.used)) : '—';
+  if(w.remaining!=null){
+    const n=Number(w.remaining);
+    main = (Number.isFinite(n)? n.toPrecision(4).replace(/\.?0+$/,'') : String(w.remaining));
+  } else if(w.used!=null){
+    const n=Number(w.used);
+    main = 'used '+(Number.isFinite(n)? n.toPrecision(4).replace(/\.?0+$/,'') : String(w.used));
+  }
+  let reset='';
+  if(w.resets_at){
+    try{
+      const d=new Date(w.resets_at);
+      if(!isNaN(d.getTime())){
+        const mm=String(d.getMonth()+1).padStart(2,'0');
+        const dd=String(d.getDate()).padStart(2,'0');
+        const hh=String(d.getHours()).padStart(2,'0');
+        const mi=String(d.getMinutes()).padStart(2,'0');
+        reset='<small>'+mm+'-'+dd+' '+hh+':'+mi+'</small>';
+      }
+    }catch(e){}
+  }
+  if(main==='—' && !reset) return '—';
+  return main+reset;
+}
+function planFromAuthFile(entry){
+  if(!entry||typeof entry!=='object') return '';
+  if(entry.plan) return String(entry.plan);
+  if(entry.plan_type) return String(entry.plan_type);
+  if(entry.planType) return String(entry.planType);
+  const idt=entry.id_token;
+  if(idt && typeof idt==='object'){
+    return String(idt.plan_type||idt.planType||idt.chatgpt_plan_type||'');
+  }
+  return '';
+}
+function windowFromAuthFile(entry, which){
+  if(!entry||typeof entry!=='object') return null;
+  // Prefer explicit five_hour/weekly shapes if CPA ever exposes them.
+  const direct=entry[which]||entry[which=== 'five_hour'?'fiveHour':'weeklyLimit'];
+  if(direct && typeof direct==='object'){
+    const rem=direct.remaining??direct.remaining_fraction??direct.remainingFraction??direct.remaining_percent??direct.remainingPercent;
+    const used=direct.used??direct.used_percent??direct.usedPercent;
+    const resets=direct.resets_at??direct.reset_at??direct.resetsAt??direct.resetAt;
+    if(rem!=null||used!=null||resets!=null){
+      const w={}; if(rem!=null) w.remaining=Number(rem); if(used!=null) w.used=Number(used); if(resets!=null) w.resets_at=resets; return w;
+    }
+  }
+  return null;
+}
+function windowFromWham(usage, which){
+  if(!usage||typeof usage!=='object') return null;
+  const rate=usage.rate_limit||usage.rateLimit||{};
+  let win=null;
+  if(which==='five_hour'){
+    win=rate.primary_window||rate.primaryWindow||null;
+    if(win && Number(win.limit_window_seconds||win.limitWindowSeconds||0) && Number(win.limit_window_seconds||win.limitWindowSeconds)!==18000){
+      // keep; duration matcher below can still use it
+    }
+  } else {
+    win=rate.secondary_window||rate.secondaryWindow||null;
+  }
+  // Duration-based fallback across both windows.
+  const cands=[rate.primary_window||rate.primaryWindow, rate.secondary_window||rate.secondaryWindow].filter(Boolean);
+  if(which==='five_hour'){
+    const byDur=cands.find(w=>Number(w.limit_window_seconds||w.limitWindowSeconds||0)===18000);
+    if(byDur) win=byDur;
+  } else {
+    const byDur=cands.find(w=>{const s=Number(w.limit_window_seconds||w.limitWindowSeconds||0); return s===604800 || (s>=2419200&&s<=2678400);});
+    if(byDur) win=byDur;
+  }
+  if(!win) return null;
+  const used=win.used_percent??win.usedPercent;
+  const rem = used!=null ? (100-Number(used)) : (win.remaining_percent??win.remainingPercent??win.remaining);
+  const resets=win.reset_at??win.resetAt??win.resets_at??win.resetsAt;
+  if(rem==null && used==null && !resets) return null;
+  const out={};
+  if(rem!=null) out.remaining=Number(rem);
+  if(used!=null) out.used=Number(used);
+  if(resets!=null){
+    // unix seconds → ISO
+    const n=Number(resets);
+    out.resets_at = (Number.isFinite(n) && n>1000000000) ? new Date(n*1000).toISOString() : String(resets);
+  }
+  return out;
+}
+function applyQuotaToRow(row, plan, five, weekly){
+  if(plan){ const el=row.querySelector('[data-col="plan"]'); if(el) el.textContent=plan; }
+  if(five){ const el=row.querySelector('[data-col="five_hour"]'); if(el) el.innerHTML=fmtQuotaWindow(five); }
+  if(weekly){ const el=row.querySelector('[data-col="weekly"]'); if(el) el.innerHTML=fmtQuotaWindow(weekly); }
+}
+async function enrichQuotaFromManagement(){
+  const k=key();
+  if(!k) return;
+  const o=document.getElementById('result');
+  try{
+    const r=await fetch('/v0/management/auth-files',{headers:{'Authorization':'Bearer '+k,'Accept':'application/json'}});
+    if(!r.ok){ if(o) o.textContent='auth-files HTTP '+r.status; return; }
+    const data=await r.json();
+    const files=Array.isArray(data)?data:(data.files||data.items||[]);
+    const byIndex={}; const byName={};
+    files.forEach(f=>{
+      if(!f) return;
+      const idx=String(f.auth_index||f.authIndex||'');
+      const name=String(f.name||'');
+      if(idx) byIndex[idx]=f;
+      if(name) byName[name]=f;
+    });
+    const rows=Array.from(document.querySelectorAll('tr[data-auth-index]'));
+    for(const row of rows){
+      const idx=row.getAttribute('data-auth-index')||'';
+      const name=row.getAttribute('data-name')||'';
+      const entry=byIndex[idx]||byName[name];
+      if(!entry) continue;
+      const plan=planFromAuthFile(entry);
+      let five=windowFromAuthFile(entry,'five_hour');
+      let weekly=windowFromAuthFile(entry,'weekly');
+      // Live 5h/weekly: same source CPA admin uses (api-call → wham/usage).
+      try{
+        const accountId=(entry.id_token&& (entry.id_token.chatgpt_account_id||entry.id_token.chatgptAccountId))||'';
+        const header={'Authorization':'Bearer $TOKEN$','Content-Type':'application/json','Accept':'application/json'};
+        if(accountId) header['Chatgpt-Account-Id']=accountId;
+        const ur=await fetch('/v0/management/api-call',{
+          method:'POST',
+          headers:{'Authorization':'Bearer '+k,'Content-Type':'application/json','Accept':'application/json'},
+          body:JSON.stringify({authIndex:idx, method:'GET', url:'https://chatgpt.com/backend-api/wham/usage', header:header})
+        });
+        if(ur.ok){
+          const uj=await ur.json();
+          const body=uj.body!=null?uj.body:(uj.Body!=null?uj.Body:uj);
+          let usage=body;
+          if(typeof usage==='string'){ try{usage=JSON.parse(usage);}catch(e){usage=null;} }
+          if(usage && typeof usage==='object'){
+            const p2=usage.plan_type||usage.planType||'';
+            if(p2 && !plan) {/* fill below */}
+            const f2=windowFromWham(usage,'five_hour');
+            const w2=windowFromWham(usage,'weekly');
+            if(f2) five=f2;
+            if(w2) weekly=w2;
+            applyQuotaToRow(row, plan||p2||'', five, weekly);
+            continue;
+          }
+        }
+      }catch(e){ /* keep auth-files plan only */ }
+      applyQuotaToRow(row, plan, five, weekly);
+    }
+  }catch(e){ if(o) o.textContent=String(e); }
+}
+const keyInput=document.getElementById('management-key');
+if(keyInput){
+  keyInput.addEventListener('change', ()=>{ enrichQuotaFromManagement(); });
+  keyInput.addEventListener('blur', ()=>{ enrichQuotaFromManagement(); });
 }
 renderTimes();
 </script>

@@ -22,7 +22,7 @@ https://raw.githubusercontent.com/danielhuang-030/cpa-plugin-codex-selective-pin
 Place the shared library under CPA’s plugin directory (often `plugins/`), or let the store unpack the release zip there:
 
 ```text
-codex-selective-ping_0.1.3_linux_amd64.zip
+codex-selective-ping_0.1.4_linux_amd64.zip
 └── codex-selective-ping.so
 ```
 
@@ -85,7 +85,7 @@ GET/PATCH /v0/management/plugins/codex-selective-ping/config
 - Manual **Run now** still works when scheduled ping is disabled (`schedule_enabled: false`); only the daily schedule is stopped.
 - UI language follows CPA Management Center (`cli-proxy-language` / `Accept-Language`). Override with `?lang=zh-Hant|en|ja`. Unsupported locales fall back to Traditional Chinese. The plugin never writes CPA’s language key.
 - UI theme follows CPA (`cli-proxy-theme` / `cli-proxy-color-scheme` / `theme`, then `prefers-color-scheme`). Override with `?theme=light|dark`. Applies `data-theme` on `<html>`.
-- Quota columns (Plan / 5h / weekly) show host-provided values only; missing fields render as "—".
+- Quota columns (Plan / 5h / weekly): Plan comes from the Codex id_token (`chatgpt_plan_type`). With a Management Key the page also fills live 5h/weekly from CPA `auth-files` + `api-call` (same `wham/usage` path as CPA admin). Missing values stay "—" and are never estimated; quota is informational and does not affect ping selection.
 
 ## Reference
 

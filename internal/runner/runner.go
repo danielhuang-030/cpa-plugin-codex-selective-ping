@@ -2,7 +2,6 @@ package runner
 
 import (
 	"context"
-	"encoding/json"
 	"sort"
 	"sync"
 	"time"
@@ -146,11 +145,7 @@ func (r *Runner) RunClaimed(parent context.Context, cfg config.Config, force boo
 func enrichAll(ctx context.Context, h hostapi.Host, files []hostapi.AuthFile) []hostapi.AuthFile {
 	out := make([]hostapi.AuthFile, len(files))
 	for i, f := range files {
-		var runtime json.RawMessage
-		if raw, err := h.AuthGetRuntime(ctx, f.AuthIndex); err == nil {
-			runtime = raw
-		}
-		out[i] = hostapi.EnrichQuota(f, runtime)
+		out[i] = hostapi.EnrichFromHost(ctx, h, f)
 	}
 	return out
 }
