@@ -4,3 +4,4 @@ cpa-plugin-codex-auto-ping/
 *.dll
 *.h
 *.sum
+.worktrees/

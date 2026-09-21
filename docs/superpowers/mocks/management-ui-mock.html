@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Codex Selective Ping — UI Mock</title>
+<style>
+  :root {
+    --bg:#f4f6f8; --card:#fff; --text:#1f2937; --muted:#6b7280;
+    --line:#e5e7eb; --brand:#2563eb; --ok:#059669; --warn:#d97706; --bad:#dc2626;
+    --chip:#eff6ff; --chip-text:#1d4ed8;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--bg);color:var(--text)}
+  header{background:#111827;color:#fff;padding:16px 24px}
+  header h1{margin:0;font-size:18px;font-weight:600}
+  header p{margin:4px 0 0;font-size:12px;opacity:.75}
+  main{max-width:1100px;margin:20px auto;padding:0 16px 40px;display:grid;gap:16px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 18px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+  .card h2{margin:0 0 12px;font-size:15px}
+  .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+  @media(max-width:800px){.grid{grid-template-columns:repeat(2,1fr)}}
+  .stat{background:#f9fafb;border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+  .stat .k{font-size:11px;color:var(--muted)}
+  .stat .v{font-size:14px;font-weight:600;margin-top:4px}
+  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  label{font-size:13px;color:var(--muted)}
+  input[type=text],input[type=password],input[type=time]{border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:13px}
+  input[type=password]{min-width:220px}
+  button{border:0;border-radius:8px;padding:8px 12px;font-size:13px;cursor:pointer}
+  .btn{background:var(--brand);color:#fff}
+  .btn.secondary{background:#e5e7eb;color:#111}
+  .btn.danger{background:#fee2e2;color:#991b1b}
+  .hint{font-size:12px;color:var(--muted);margin-top:8px}
+  .tag{display:inline-block;padding:2px 8px;border-radius:999px;background:var(--chip);color:var(--chip-text);font-size:11px}
+  .tag.ok{background:#d1fae5;color:#065f46}
+  .tag.warn{background:#ffedd5;color:#9a3412}
+  .tag.bad{background:#fee2e2;color:#991b1b}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{padding:10px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+  th{font-size:11px;color:var(--muted);font-weight:600}
+  .quota{font-variant-numeric:tabular-nums;white-space:nowrap}
+  .quota small{display:block;color:var(--muted);font-size:11px}
+  .banner{background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;border-radius:10px;padding:10px 12px;font-size:13px}
+  .mock-note{position:sticky;top:0;z-index:2;background:#1e3a8a;color:#fff;padding:8px 16px;font-size:12px}
+</style>
+</head>
+<body>
+<div class="mock-note">這是預期 UI mock（靜態），不是真的 CPA 插件頁。資料為示例。</div>
+<header>
+  <h1>Codex Selective Ping</h1>
+  <p>獨立 CPA 插件 · 指定帳號排程 ping · 管理頁 mock</p>
+</header>
+<main>
+  <section class="card">
+    <h2>概況</h2>
+    <div class="grid">
+      <div class="stat"><div class="k">狀態</div><div class="v"><span class="tag ok">已啟用</span></div></div>
+      <div class="stat"><div class="k">版本 / 模型</div><div class="v">0.1.0 · gpt-5.4-mini</div></div>
+      <div class="stat"><div class="k">時區 / 時段</div><div class="v">Asia/Taipei · 06:00 / 11:00 / 16:00 / 21:00</div></div>
+      <div class="stat"><div class="k">下次執行</div><div class="v">今天 21:00 · 未在執行</div></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>排程</h2>
+    <div class="row" style="margin-bottom:10px">
+      <label>時區</label>
+      <input type="text" value="Asia/Taipei"/>
+      <label>新增時段</label>
+      <input type="time" value="21:00"/>
+      <button class="btn secondary" type="button">加入</button>
+    </div>
+    <div class="row">
+      <span class="tag">06:00 ×</span>
+      <span class="tag">11:00 ×</span>
+      <span class="tag">16:00 ×</span>
+      <span class="tag">21:00 ×</span>
+    </div>
+    <p class="hint">啟動時不會立刻全 ping；到點才跑。空帳號清單 = 誰都不 ping。</p>
+  </section>
+
+  <section class="card">
+    <h2>帳號</h2>
+    <div class="banner">目前已勾選 2 / 4 個帳號。未勾選的不會被排程或「立刻執行」打到。</div>
+    <div class="row" style="margin:12px 0">
+      <button class="btn secondary" type="button">全選</button>
+      <button class="btn secondary" type="button">清除</button>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th></th>
+          <th>帳號</th>
+          <th>Plan</th>
+          <th>5h</th>
+          <th>週限</th>
+          <th>狀態</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><input type="checkbox" checked/></td>
+          <td>alice@example.com<br/><small style="color:#6b7280">auth_index: 12</small></td>
+          <td>Plus</td>
+          <td class="quota">62%<small>重置 21:40</small></td>
+          <td class="quota">81%<small>重置 週三 08:00</small></td>
+          <td><span class="tag ok">可用</span></td>
+        </tr>
+        <tr>
+          <td><input type="checkbox" checked/></td>
+          <td>bob-work<br/><small style="color:#6b7280">bob@company.tw · auth_index: 18</small></td>
+          <td>Team</td>
+          <td class="quota">18%<small>重置 19:05</small></td>
+          <td class="quota">44%<small>重置 週一 08:00</small></td>
+          <td><span class="tag warn">接近上限</span></td>
+        </tr>
+        <tr>
+          <td><input type="checkbox"/></td>
+          <td>spare-codex<br/><small style="color:#6b7280">spare@example.com · auth_index: 21</small></td>
+          <td>Free</td>
+          <td class="quota">0%<small>重置 明天 02:11</small></td>
+          <td class="quota">0%<small>重置 下週一</small></td>
+          <td><span class="tag bad">limited</span></td>
+        </tr>
+        <tr>
+          <td><input type="checkbox"/></td>
+          <td>old-token<br/><small style="color:#6b7280">auth_index: 3</small></td>
+          <td>—</td>
+          <td class="quota">—</td>
+          <td class="quota">—</td>
+          <td><span class="tag bad">unavailable</span></td>
+        </tr>
+      </tbody>
+    </table>
+    <p class="hint">5h／週限來自 CPA 既有資料；沒有就顯示 —，不會自己推估。額度欄只供參考，不決定是否 ping。</p>
+  </section>
+
+  <section class="card">
+    <h2>動作</h2>
+    <div class="row">
+      <input type="password" placeholder="Management Key（當次輸入，不寫入 localStorage）"/>
+      <button class="btn" type="button">儲存設定</button>
+      <button class="btn secondary" type="button">立刻執行</button>
+      <button class="btn secondary" type="button">重新整理</button>
+    </div>
+    <p class="hint">儲存：PATCH 宿主 plugins.configs。立刻執行：只 ping 目前勾選且已儲存的帳號。</p>
+  </section>
+
+  <section class="card">
+    <h2>最近一次結果</h2>
+    <div class="row" style="margin-bottom:8px">
+      <span class="tag">mode: manual</span>
+      <span class="tag">2026-09-21 20:51</span>
+      <span class="tag ok">ok 1</span>
+      <span class="tag warn">limited 1</span>
+      <span class="tag">skipped 2</span>
+    </div>
+    <table>
+      <thead><tr><th>帳號</th><th>結果</th><th>HTTP</th><th>說明</th></tr></thead>
+      <tbody>
+        <tr><td>alice@example.com</td><td><span class="tag ok">success</span></td><td>200</td><td>—</td></tr>
+        <tr><td>bob-work</td><td><span class="tag warn">limited</span></td><td>429</td><td>resets_at 19:05</td></tr>
+      </tbody>
+    </table>
+  </section>
+</main>
+</body>
+</html>

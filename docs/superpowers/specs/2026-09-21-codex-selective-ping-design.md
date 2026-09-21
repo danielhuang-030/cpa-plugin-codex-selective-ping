@@ -1,7 +1,7 @@
 # Codex Selective Ping（CPA 插件）設計規格
 
 日期：2026-09-21  
-狀態：待使用者審核  
+狀態：已核准（UI mock + spec OK）  
 參考：`jiz4oh/cpa-plugin-codex-auto-ping`、CLIProxyAPI Plugin Development 文件
 
 ## 1. 目標
