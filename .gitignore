@@ -1,0 +1,6 @@
+cpa-plugin-codex-auto-ping/
+*.so
+*.dylib
+*.dll
+*.h
+*.sum
