@@ -168,3 +168,12 @@ func TestRenderStatusPageAuthFilesQuotaEnrichJS(t *testing.T) {
 		t.Fatal("expected em-dash placeholders when quota unknown")
 	}
 }
+
+func TestRenderStatusPageV3ShellLandmarks(t *testing.T) {
+	html := RenderStatusPage(StatusResponse{Version: "0.1.5"}, LangZhHant)
+	for _, needle := range []string{`class="shell"`, `class="rail"`, `class="workspace"`} {
+		if !strings.Contains(html, needle) {
+			t.Fatalf("missing v3 landmark %s", needle)
+		}
+	}
+}

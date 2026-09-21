@@ -145,18 +145,17 @@ pre{white-space:pre-wrap;background:var(--pre);padding:12px;border-radius:6px}
 </style>
 </head>
 <body>
-<header>
-  <div class="titles">
-    <h1 data-i18n="title">%s</h1>
-    <p data-i18n="subtitle">%s</p>
-  </div>
+<div class="shell">
+<aside class="rail">
+  <p class="brand">Selective<br/><em>Ping</em></p>
+  <p class="lede" data-i18n="subtitle">%s</p>
   <nav class="lang-switch" aria-label="language">
     <a href="?lang=zh-Hant" class="%s" data-lang="zh-Hant">%s</a>
     <a href="?lang=en" class="%s" data-lang="en">%s</a>
     <a href="?lang=ja" class="%s" data-lang="ja">%s</a>
   </nav>
-</header>
-<main>
+</aside>
+<div class="workspace">
 <section class="card"><h2 data-i18n="overview">%s</h2>
 <div class="grid">
   <div class="stat"><div class="k" data-i18n="status">%s</div><div class="v">%s</div></div>
@@ -197,7 +196,8 @@ pre{white-space:pre-wrap;background:var(--pre);padding:12px;border-radius:6px}
 <pre id="result"></pre>
 </section>
 <section class="card"><h2 data-i18n="last_run">%s</h2>%s</section>
-</main>
+</div>
+</div>
 <script>
 const initialTimes = %s;
 const pluginId = "codex-selective-ping";
@@ -520,7 +520,6 @@ renderTimes();
 </script>
 </body></html>`,
 		html.EscapeString(string(lang)),
-		html.EscapeString(t("title")),
 		html.EscapeString(t("title")),
 		html.EscapeString(t("subtitle")),
 		langActive(lang, LangZhHant), html.EscapeString(t("lang_zh")),
