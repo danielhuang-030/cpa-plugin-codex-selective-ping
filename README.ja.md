@@ -22,7 +22,7 @@ https://raw.githubusercontent.com/danielhuang-030/cpa-plugin-codex-selective-pin
 共有ライブラリを CPA のプラグインディレクトリ（多くは `plugins/`）へ置くか、ストアに release zip を展開させます：
 
 ```text
-codex-selective-ping_0.1.2_linux_amd64.zip
+codex-selective-ping_0.1.3_linux_amd64.zip
 └── codex-selective-ping.so
 ```
 

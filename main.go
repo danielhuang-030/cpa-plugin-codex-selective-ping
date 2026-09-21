@@ -113,15 +113,7 @@ func selectivePingPluginCall(method *C.char, request *C.uint8_t, requestLen C.si
 	}
 	switch name {
 	case "plugin.register", "plugin.reconfigure":
-		var req struct {
-			ConfigYAML string `json:"config_yaml"`
-		}
-		if len(requestBytes) > 0 {
-			if err := json.Unmarshal(requestBytes, &req); err != nil {
-				return writeJSON(response, failEnvelope("invalid_request", "invalid plugin configuration envelope"))
-			}
-		}
-		cfg, err := config.Parse(req.ConfigYAML)
+		cfg, err := parseRegisterConfigJSON(requestBytes)
 		if err != nil {
 			return writeJSON(response, failEnvelope("invalid_config", err.Error()))
 		}

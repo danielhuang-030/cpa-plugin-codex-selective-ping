@@ -22,7 +22,7 @@ https://raw.githubusercontent.com/danielhuang-030/cpa-plugin-codex-selective-pin
 把動態庫放到 CPA 插件目錄（常見為 `plugins/`），或讓商店把 release zip 解到該處：
 
 ```text
-codex-selective-ping_0.1.2_linux_amd64.zip
+codex-selective-ping_0.1.3_linux_amd64.zip
 └── codex-selective-ping.so
 ```
 

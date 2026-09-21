@@ -22,7 +22,7 @@ https://raw.githubusercontent.com/danielhuang-030/cpa-plugin-codex-selective-pin
 Place the shared library under CPA’s plugin directory (often `plugins/`), or let the store unpack the release zip there:
 
 ```text
-codex-selective-ping_0.1.2_linux_amd64.zip
+codex-selective-ping_0.1.3_linux_amd64.zip
 └── codex-selective-ping.so
 ```
 
