@@ -110,25 +110,38 @@ func RenderStatusPage(st StatusResponse, lang Lang) string {
 	var rows strings.Builder
 	for _, a := range st.Accounts {
 		checked := ""
+		cardClass := "acct"
 		if a.Selected {
 			checked = " checked"
+			cardClass = "acct selected"
 		}
-		fmt.Fprintf(&rows, `<tr data-auth-index="%s" data-name="%s">
-<td><input type="checkbox" class="acct" data-id="%s"%s></td>
-<td>%s<br><small>%s · %s: %s</small></td>
-<td class="quota-plan" data-col="plan">%s</td>
-<td class="quota" data-col="five_hour">%s</td>
-<td class="quota" data-col="weekly">%s</td>
-<td>%s</td>
-</tr>`,
-			html.EscapeString(a.AuthIndex), html.EscapeString(a.Name),
+		statusChip := statusChipClass(a.Status)
+		meta := html.EscapeString(a.Email)
+		if meta == "" {
+			meta = html.EscapeString(t("auth_index_label"))
+		}
+		meta = meta + " · " + html.EscapeString(a.AuthIndex)
+		fmt.Fprintf(&rows, `<div class="%s" data-auth-index="%s" data-name="%s" data-selected="%t" data-abnormal="%t">
+<input type="checkbox" class="acct" data-id="%s"%s onchange="syncAcctCard(this)">
+<div><div class="name">%s</div><div class="meta">%s</div></div>
+<div class="hide-sm"><span class="chip" data-col="plan">%s</span></div>
+<div class="hide-sm"><div class="quota-label" data-i18n="col_5h">%s</div><div class="quota" data-col="five_hour">%s</div></div>
+<div class="hide-sm"><div class="quota-label" data-i18n="col_weekly">%s</div><div class="quota" data-col="weekly">%s</div></div>
+<span class="chip %s" data-col="status">%s</span>
+</div>`,
+			cardClass,
+			html.EscapeString(a.AuthIndex), html.EscapeString(a.Name), a.Selected, accountAbnormal(a),
 			html.EscapeString(preferID(a)), checked,
-			html.EscapeString(a.Name), html.EscapeString(a.Email), html.EscapeString(t("auth_index_label")), html.EscapeString(a.AuthIndex),
+			html.EscapeString(a.Name), meta,
 			dash(a.Plan),
-			formatWindow(a.FiveHour, lang),
-			formatWindow(a.Weekly, lang),
-			html.EscapeString(orDash(a.Status)),
+			html.EscapeString(t("col_5h")), formatWindow(a.FiveHour, lang),
+			html.EscapeString(t("col_weekly")), formatWindow(a.Weekly, lang),
+			statusChip, html.EscapeString(orDash(a.Status)),
 		)
+	}
+	accountsEmptyClass := ""
+	if selectedN > 0 {
+		accountsEmptyClass = " hidden"
 	}
 	lastBlock := `<p class="hint" data-i18n="no_last_run">` + html.EscapeString(t("no_last_run")) + `</p>`
 	if st.LastRun != nil {
@@ -233,17 +246,32 @@ pre{white-space:pre-wrap;background:var(--pre);padding:12px;border-radius:6px}
   </label>
 </div>
 </section>
-<section class="card"><h2 data-i18n="accounts">%s</h2>
-<div class="banner" id="banner">%s</div>
-<div class="row" style="margin:12px 0">
-  <button class="btn secondary" type="button" onclick="setAll(true)" data-i18n="select_all">%s</button>
-  <button class="btn secondary" type="button" onclick="setAll(false)" data-i18n="clear">%s</button>
+<section class="panel" id="sec-accounts-filled">
+<div class="accounts-head">
+  <div>
+    <h2 data-i18n="accounts_who_title">%s</h2>
+    <p class="sub" data-i18n="accounts_hint" style="margin:0">%s</p>
+  </div>
+  <div class="tabs">
+    <button class="tab on" type="button" data-filter="all" onclick="filterAccounts('all')" data-i18n="filter_all">%s</button>
+    <button class="tab" type="button" data-filter="selected" onclick="filterAccounts('selected')" data-i18n="filter_selected">%s</button>
+    <button class="tab" type="button" data-filter="abnormal" onclick="filterAccounts('abnormal')" data-i18n="filter_abnormal">%s</button>
+  </div>
 </div>
-<table>
-<thead><tr><th></th><th data-i18n="col_account">%s</th><th data-i18n="col_plan">%s</th><th data-i18n="col_5h">%s</th><th data-i18n="col_weekly">%s</th><th data-i18n="col_status">%s</th></tr></thead>
-<tbody>%s</tbody>
-</table>
-<p class="hint" data-i18n="accounts_hint">%s</p>
+<div class="row" style="margin:0 0 12px;gap:8px">
+  <button class="btn-secondary" type="button" onclick="setAll(true)" data-i18n="select_all">%s</button>
+  <button class="btn-secondary" type="button" onclick="setAll(false)" data-i18n="clear">%s</button>
+</div>
+<div class="banner" id="banner">%s</div>
+<div class="account-grid" id="account-grid">%s</div>
+</section>
+<section class="panel%s" id="sec-accounts-empty">
+  <h2 data-i18n="accounts_empty_heading">%s</h2>
+  <div class="empty">
+    <strong data-i18n="accounts_empty_title">%s</strong>
+    <p data-i18n="accounts_empty_body">%s</p>
+    <button class="btn-primary" type="button" onclick="document.getElementById('sec-accounts-filled')?.scrollIntoView({behavior:'smooth'})" data-i18n="accounts_empty_cta">%s</button>
+  </div>
 </section>
 <section class="card"><h2 data-i18n="actions">%s</h2>
 <div class="row">
@@ -402,7 +430,33 @@ function addTime(){
   if(!times.includes(n)) times.push(n);
   times.sort(); renderTimes();
 }
-function setAll(v){ document.querySelectorAll('input.acct').forEach(c=>c.checked=v); }
+function setAll(v){
+  document.querySelectorAll('input.acct').forEach(c=>{ c.checked=v; syncAcctCard(c); });
+  const empty=document.getElementById('sec-accounts-empty');
+  if(empty){ empty.classList.toggle('hidden', !!v && document.querySelectorAll('input.acct:checked').length>0); }
+}
+function syncAcctCard(cb){
+  const card=cb.closest('.acct[data-auth-index],div[data-auth-index]');
+  if(!card) return;
+  card.classList.toggle('selected', cb.checked);
+  card.setAttribute('data-selected', cb.checked ? 'true' : 'false');
+  const empty=document.getElementById('sec-accounts-empty');
+  if(empty){
+    const n=document.querySelectorAll('input.acct:checked').length;
+    empty.classList.toggle('hidden', n>0);
+  }
+}
+function filterAccounts(mode){
+  document.querySelectorAll('.tabs .tab').forEach(t=>t.classList.toggle('on', t.getAttribute('data-filter')===mode));
+  document.querySelectorAll('#account-grid > [data-auth-index]').forEach(card=>{
+    const sel=card.getAttribute('data-selected')==='true';
+    const abn=card.getAttribute('data-abnormal')==='true';
+    let show=true;
+    if(mode==='selected') show=sel;
+    if(mode==='abnormal') show=abn;
+    card.style.display = show ? '' : 'none';
+  });
+}
 function selectedAccounts(){
   return Array.from(document.querySelectorAll('input.acct:checked')).map(c=>c.getAttribute('data-id'));
 }
@@ -542,7 +596,7 @@ async function enrichQuotaFromManagement(){
       if(idx) byIndex[idx]=f;
       if(name) byName[name]=f;
     });
-    const rows=Array.from(document.querySelectorAll('tr[data-auth-index]'));
+    const rows=Array.from(document.querySelectorAll('[data-auth-index]'));
     for(const row of rows){
       const idx=row.getAttribute('data-auth-index')||'';
       const name=row.getAttribute('data-name')||'';
@@ -613,17 +667,20 @@ renderTimes();
 		html.EscapeString(t("add")),
 		enabledChecked,
 		html.EscapeString(t("enable")),
-		html.EscapeString(t("accounts")),
-		html.EscapeString(banner),
+		html.EscapeString(t("accounts_who_title")),
+		html.EscapeString(t("accounts_hint")),
+		html.EscapeString(fmt.Sprintf(t("filter_all"), len(st.Accounts))),
+		html.EscapeString(fmt.Sprintf(t("filter_selected"), selectedN)),
+		html.EscapeString(t("filter_abnormal")),
 		html.EscapeString(t("select_all")),
 		html.EscapeString(t("clear")),
-		html.EscapeString(t("col_account")),
-		html.EscapeString(t("col_plan")),
-		html.EscapeString(t("col_5h")),
-		html.EscapeString(t("col_weekly")),
-		html.EscapeString(t("col_status")),
+		html.EscapeString(banner),
 		rows.String(),
-		html.EscapeString(t("accounts_hint")),
+		accountsEmptyClass,
+		html.EscapeString(t("accounts_empty_heading")),
+		html.EscapeString(t("accounts_empty_title")),
+		html.EscapeString(t("accounts_empty_body")),
+		html.EscapeString(t("accounts_empty_cta")),
 		html.EscapeString(t("actions")),
 		html.EscapeString(t("key_placeholder")),
 		html.EscapeString(t("save")),
@@ -713,4 +770,25 @@ func formatWindow(w *hostapi.QuotaWindow, lang Lang) string {
 		return "—"
 	}
 	return main + reset
+}
+
+func statusChipClass(status string) string {
+	switch strings.ToLower(strings.TrimSpace(status)) {
+	case "success", "ok", "available":
+		return "ok"
+	case "limited", "warn", "warning":
+		return "warn"
+	case "failed", "error", "unavailable", "bad":
+		return "bad"
+	default:
+		return ""
+	}
+}
+
+func accountAbnormal(a runstate.AccountView) bool {
+	if a.Unavailable || a.Disabled {
+		return true
+	}
+	s := strings.ToLower(strings.TrimSpace(a.Status))
+	return s == "limited" || s == "failed" || s == "unavailable" || s == "error"
 }

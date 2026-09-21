@@ -195,3 +195,38 @@ func TestRenderStatusPageRhythmTimeline(t *testing.T) {
 		t.Fatal("schedule_enabled must remain")
 	}
 }
+
+func TestRenderStatusPageAccountCards(t *testing.T) {
+	html := RenderStatusPage(StatusResponse{
+		Enabled: true, Version: "0.1.5", Model: "gpt-5.4",
+		Timezone: "Asia/Taipei", Times: []string{"21:00"},
+		Accounts: []runstate.AccountView{
+			{AuthIndex: "1", Name: "alice", Email: "a@x.com", Selected: true, Plan: "Plus", Status: "success"},
+			{AuthIndex: "2", Name: "bob", Selected: false, Status: "unknown"},
+		},
+		AccountsConfig: []string{"1"},
+	}, LangZhHant)
+	if !strings.Contains(html, `class="account-grid"`) {
+		t.Fatal("missing account-grid")
+	}
+	if !strings.Contains(html, `class="acct`) {
+		t.Fatal("missing acct card")
+	}
+	if !strings.Contains(html, `class="acct selected"`) && !strings.Contains(html, `class="acct selected `) {
+		t.Fatal("missing selected acct card")
+	}
+}
+
+func TestRenderStatusPageAccountsEmptyState(t *testing.T) {
+	html := RenderStatusPage(StatusResponse{
+		Enabled: true, Version: "0.1.5", Model: "gpt-5.4",
+		Timezone: "Asia/Taipei", Times: []string{"21:00"},
+		Accounts: []runstate.AccountView{
+			{AuthIndex: "1", Name: "alice", Selected: false},
+		},
+		AccountsConfig: []string{},
+	}, LangZhHant)
+	if !strings.Contains(html, `id="sec-accounts-empty"`) && !strings.Contains(html, `data-i18n="accounts_empty_title"`) {
+		t.Fatal("missing empty whitelist empty-state")
+	}
+}
