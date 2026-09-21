@@ -177,3 +177,21 @@ func TestRenderStatusPageV3ShellLandmarks(t *testing.T) {
 		}
 	}
 }
+
+func TestRenderStatusPageRhythmTimeline(t *testing.T) {
+	html := RenderStatusPage(StatusResponse{
+		Timezone: "Asia/Taipei",
+		Enabled:  true,
+		Times:    []string{"06:00", "11:00", "16:00", "21:00"},
+		NextRun:  "21:00",
+	}, LangZhHant)
+	if !strings.Contains(html, `class="timeline"`) {
+		t.Fatal("missing timeline")
+	}
+	if !strings.Contains(html, `class="slot next"`) && !strings.Contains(html, `class="slot next `) {
+		t.Fatal("missing next slot highlight")
+	}
+	if !strings.Contains(html, `id="schedule_enabled"`) {
+		t.Fatal("schedule_enabled must remain")
+	}
+}

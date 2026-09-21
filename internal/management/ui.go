@@ -11,6 +11,51 @@ import (
 	"cpa-plugin-codex-selective-ping/internal/runstate"
 )
 
+
+func nextSlotLabel(next interface{}, times []string, timezone string) string {
+	hhmm := ""
+	switch v := next.(type) {
+	case time.Time:
+		loc := loadLoc(timezone)
+		hhmm = v.In(loc).Format("15:04")
+	case *time.Time:
+		if v != nil {
+			loc := loadLoc(timezone)
+			hhmm = v.In(loc).Format("15:04")
+		}
+	case string:
+		s := strings.TrimSpace(v)
+		if len(s) >= 5 && s[2] == ':' {
+			hhmm = s[:5]
+		} else if t, err := time.Parse(time.RFC3339, s); err == nil {
+			loc := loadLoc(timezone)
+			hhmm = t.In(loc).Format("15:04")
+		} else {
+			hhmm = s
+		}
+	}
+	if hhmm == "" {
+		return ""
+	}
+	for _, t := range times {
+		if t == hhmm {
+			return hhmm
+		}
+	}
+	// still highlight matching HH:MM even if not exact list membership after edits
+	return hhmm
+}
+
+func loadLoc(timezone string) *time.Location {
+	if timezone == "" {
+		return time.Local
+	}
+	if loc, err := time.LoadLocation(timezone); err == nil {
+		return loc
+	}
+	return time.Local
+}
+
 func RenderStatusPage(st StatusResponse, lang Lang) string {
 	if lang == "" {
 		lang = LangZhHant
@@ -43,6 +88,18 @@ func RenderStatusPage(st StatusResponse, lang Lang) string {
 	enabledChecked := ""
 	if st.Enabled {
 		enabledChecked = " checked"
+	}
+	nextSlot := nextSlotLabel(st.NextRun, st.Times, st.Timezone)
+	var timeline strings.Builder
+	for _, tm := range st.Times {
+		slotClass := "slot"
+		caption := t("slot_past")
+		if nextSlot != "" && tm == nextSlot {
+			slotClass = "slot next"
+			caption = t("slot_next")
+		}
+		fmt.Fprintf(&timeline, `<div class="%s" data-time="%s"><button class="x" type="button" aria-label="remove" onclick="removeTime('%s')">×</button><div class="t">%s</div><div class="caption">%s</div></div>`,
+			slotClass, html.EscapeString(tm), html.EscapeString(tm), html.EscapeString(tm), html.EscapeString(caption))
 	}
 	selectedN := 0
 	for _, a := range st.Accounts {
@@ -163,15 +220,18 @@ pre{white-space:pre-wrap;background:var(--pre);padding:12px;border-radius:6px}
   <div class="stat"><div class="k" data-i18n="tz_times">%s</div><div class="v">%s · %s</div></div>
   <div class="stat"><div class="k" data-i18n="next_run">%s</div><div class="v">%s · <span data-i18n="running_label">%s</span>：%s</div></div>
 </div></section>
-<section class="card"><h2 data-i18n="schedule">%s</h2>
-<div class="row" style="margin-bottom:10px">
-  <label><input id="schedule_enabled" type="checkbox"%s/> <span data-i18n="enable">%s</span></label>
-  <label data-i18n="timezone">%s</label><input id="tz" type="text" value="%s"/>
-  <label data-i18n="add_time">%s</label><input id="new-time" type="time" value="21:00"/>
-  <button class="btn secondary" type="button" onclick="addTime()" data-i18n="add">%s</button>
+<section class="panel" id="sec-rhythm">
+<h2 data-i18n="rhythm_title">%s</h2>
+<p class="sub" data-i18n="schedule_hint">%s</p>
+<div class="timeline" id="times">%s</div>
+<div class="add-row">
+  <label class="field" data-i18n="timezone">%s<input id="tz" type="text" value="%s"/></label>
+  <label class="field" data-i18n="add_time">%s<input id="new-time" type="time" value="21:00"/></label>
+  <button class="btn-secondary" type="button" onclick="addTime()" data-i18n="add">%s</button>
+  <label style="display:flex;gap:8px;align-items:center;font-size:13px;font-weight:700;margin-left:auto">
+    <input id="schedule_enabled" type="checkbox"%s/> <span data-i18n="enable">%s</span>
+  </label>
 </div>
-<div class="row" id="times"></div>
-<p class="hint" data-i18n="schedule_hint">%s</p>
 </section>
 <section class="card"><h2 data-i18n="accounts">%s</h2>
 <div class="banner" id="banner">%s</div>
@@ -200,6 +260,9 @@ pre{white-space:pre-wrap;background:var(--pre);padding:12px;border-radius:6px}
 </div>
 <script>
 const initialTimes = %s;
+const nextSlotHint = %q;
+const slotCaptionNext = %q;
+const slotCaptionPast = %q;
 const pluginId = "codex-selective-ping";
 const serverLang = %q;
 const msgNeedKey = %q;
@@ -313,16 +376,24 @@ document.querySelectorAll('.lang-switch a[data-lang]').forEach(function(a){
 });
 function renderTimes(){
   const el = document.getElementById('times');
+  if(!el) return;
   el.innerHTML = '';
-  times.forEach((t,i)=>{
-    const s = document.createElement('span');
-    s.className = 'tag';
-    s.textContent = t + ' ';
+  times.forEach((tm)=>{
+    const d = document.createElement('div');
+    const isNext = nextSlotHint && tm === nextSlotHint;
+    d.className = isNext ? 'slot next' : 'slot';
+    d.setAttribute('data-time', tm);
     const x = document.createElement('button');
-    x.type='button'; x.textContent='×'; x.className='btn secondary';
-    x.onclick=()=>{ times.splice(i,1); renderTimes(); };
-    s.appendChild(x); el.appendChild(s);
+    x.type='button'; x.className='x'; x.setAttribute('aria-label','remove'); x.textContent='×';
+    x.onclick=()=>removeTime(tm);
+    const tEl = document.createElement('div'); tEl.className='t'; tEl.textContent=tm;
+    const c = document.createElement('div'); c.className='caption'; c.textContent = isNext ? slotCaptionNext : slotCaptionPast;
+    d.appendChild(x); d.appendChild(tEl); d.appendChild(c); el.appendChild(d);
   });
+}
+function removeTime(tm){
+  const i = times.indexOf(tm);
+  if(i>=0){ times.splice(i,1); renderTimes(); }
 }
 function addTime(){
   const v = document.getElementById('new-time').value;
@@ -533,14 +604,15 @@ renderTimes();
 		html.EscapeString(st.Timezone), html.EscapeString(strings.Join(st.Times, " / ")),
 		html.EscapeString(t("next_run")),
 		html.EscapeString(next), html.EscapeString(t("running_label")), html.EscapeString(running),
-		html.EscapeString(t("schedule")),
-		enabledChecked,
-		html.EscapeString(t("enable")),
+		html.EscapeString(t("rhythm_title")),
+		html.EscapeString(t("schedule_hint")),
+		timeline.String(),
 		html.EscapeString(t("timezone")),
 		html.EscapeString(st.Timezone),
 		html.EscapeString(t("add_time")),
 		html.EscapeString(t("add")),
-		html.EscapeString(t("schedule_hint")),
+		enabledChecked,
+		html.EscapeString(t("enable")),
 		html.EscapeString(t("accounts")),
 		html.EscapeString(banner),
 		html.EscapeString(t("select_all")),
@@ -561,6 +633,9 @@ renderTimes();
 		html.EscapeString(t("last_run")),
 		lastBlock,
 		string(timesJSON),
+		nextSlot,
+		t("slot_next"),
+		t("slot_past"),
 		string(lang),
 		needKey,
 		saving,
