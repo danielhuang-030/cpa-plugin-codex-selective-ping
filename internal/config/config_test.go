@@ -123,3 +123,34 @@ func TestValidateDedupesTimesAndAllowsEmptyAccounts(t *testing.T) {
 		t.Fatalf("accounts=%#v", cfg.Accounts)
 	}
 }
+
+
+func TestParseYAMLDataDirAndStatePath(t *testing.T) {
+	raw := `
+schedule_enabled: true
+timezone: UTC
+times: ["06:00"]
+data_dir: /var/cpa/data/codex-selective-ping
+state_path: /tmp/custom-last-run.json
+`
+	cfg, err := Parse(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.DataDir != "/var/cpa/data/codex-selective-ping" {
+		t.Fatalf("DataDir=%q", cfg.DataDir)
+	}
+	if cfg.StatePath != "/tmp/custom-last-run.json" {
+		t.Fatalf("StatePath=%q", cfg.StatePath)
+	}
+}
+
+func TestParseJSONDataDirAndStatePath(t *testing.T) {
+	cfg, err := Parse(`{"schedule_enabled":true,"timezone":"UTC","times":["06:00"],"data_dir":"rel-data","state_path":"rel-state.json"}`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.DataDir != "rel-data" || cfg.StatePath != "rel-state.json" {
+		t.Fatalf("%#v", cfg)
+	}
+}

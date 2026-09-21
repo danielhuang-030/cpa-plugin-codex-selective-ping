@@ -74,11 +74,12 @@ type accountMem struct {
 }
 
 type State struct {
-	mu      sync.RWMutex
-	running bool
-	nextRun time.Time
-	lastRun *Summary
-	byIndex map[string]accountMem
+	mu          sync.RWMutex
+	running     bool
+	nextRun     time.Time
+	lastRun     *Summary
+	byIndex     map[string]accountMem
+	persistPath string
 }
 
 func New() *State {
@@ -97,7 +98,6 @@ func (s *State) TryBegin() bool {
 
 func (s *State) End(summary Summary) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	s.running = false
 	cp := summary
 	cp.Accounts = append([]AccountResult(nil), summary.Accounts...)
@@ -123,6 +123,9 @@ func (s *State) End(summary Summary) {
 		}
 		s.byIndex[a.AuthIndex] = m
 	}
+	toSave := cp
+	s.mu.Unlock()
+	s.persistLastRun(toSave)
 }
 
 func (s *State) SetNextRun(t time.Time) {

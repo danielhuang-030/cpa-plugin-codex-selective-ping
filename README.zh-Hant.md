@@ -22,7 +22,7 @@ https://raw.githubusercontent.com/danielhuang-030/cpa-plugin-codex-selective-pin
 把動態庫放到 CPA 插件目錄（常見為 `plugins/`），或讓商店把 release zip 解到該處：
 
 ```text
-codex-selective-ping_0.1.4_linux_amd64.zip
+codex-selective-ping_0.1.5_linux_amd64.zip
 └── codex-selective-ping.so
 ```
 
@@ -50,6 +50,7 @@ plugins:
 - `accounts` 可與 `auth_index`（精確）或 email／name／account（不分大小寫）匹配。
 - 空的 `accounts` → 排程與手動執行的 attempted 皆為 0。
 - CPA 啟動時不會立刻 ping，等到下一個設定時段才跑。
+- 最近一次執行摘要會寫入 `{CPA 根目錄}/data/codex-selective-ping/last_run.json`（`plugins/` 上一層），重載後管理頁仍可顯示。可選覆寫：`data_dir`、`state_path`（相對路徑相對 CPA 工作目錄）。不會寫入 `auth-dir` / `auths/`。
 
 必要時重啟或重載 CPA，然後開啟：
 

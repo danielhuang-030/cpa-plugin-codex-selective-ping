@@ -40,6 +40,8 @@ func (p *Plugin) ApplyConfig(cfg config.Config) {
 	p.mu.Lock()
 	p.cfg = cfg
 	p.mu.Unlock()
+	path := runstate.ResolveStatePath(cfg.StatePath, cfg.DataDir)
+	p.State.SetPersistPath(path)
 	p.Sched.Start(cfg)
 }
 

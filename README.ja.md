@@ -22,7 +22,7 @@ https://raw.githubusercontent.com/danielhuang-030/cpa-plugin-codex-selective-pin
 共有ライブラリを CPA のプラグインディレクトリ（多くは `plugins/`）へ置くか、ストアに release zip を展開させます：
 
 ```text
-codex-selective-ping_0.1.4_linux_amd64.zip
+codex-selective-ping_0.1.5_linux_amd64.zip
 └── codex-selective-ping.so
 ```
 
@@ -50,6 +50,7 @@ plugins:
 - `accounts` は `auth_index`（完全一致）または email / name / account（大文字小文字を区別しない）と照合します。
 - `accounts` が空 → スケジュール実行も手動実行も attempted は 0 です。
 - CPA 起動時には ping せず、次の設定時刻まで待ちます。
+- 直近の実行サマリーは `{CPA ルート}/data/codex-selective-ping/last_run.json`（`plugins/` の親）に保存され、再読込後も管理 UI に残ります。任意の上書き: `data_dir` / `state_path`（相対パスは CPA の cwd 基準）。`auth-dir` / `auths/` には書き込みません。
 
 必要なら CPA を再起動／再読込し、次を開きます：
 
