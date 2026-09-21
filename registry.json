@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "plugins": [
+    {
+      "id": "codex-selective-ping",
+      "name": "Codex Selective Ping",
+      "description": "Ping only selected Codex OAuth accounts on a daily schedule, with a Traditional Chinese management UI.",
+      "author": "danielhuang",
+      "version": "0.1.0",
+      "repository": "",
+      "homepage": "",
+      "license": "MIT",
+      "tags": ["codex", "quota", "scheduler", "management", "selective"]
+    }
+  ]
+}
