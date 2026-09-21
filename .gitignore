@@ -5,3 +5,6 @@ cpa-plugin-codex-auto-ping/
 *.h
 *.sum
 .worktrees/
+dist/
+package/
+*.test

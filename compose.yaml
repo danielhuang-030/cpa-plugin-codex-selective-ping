@@ -1,0 +1,40 @@
+services:
+  dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: cpa-plugin-codex-selective-ping-dev:local
+    working_dir: /src
+    volumes:
+      - .:/src
+    environment:
+      CGO_ENABLED: "1"
+      GOTOOLCHAIN: local
+    # Keep running so `docker compose exec dev ...` works
+    command: ["sleep", "infinity"]
+    stdin_open: true
+    tty: true
+
+  test:
+    profiles: ["tools"]
+    image: cpa-plugin-codex-selective-ping-dev:local
+    working_dir: /src
+    volumes:
+      - .:/src
+    environment:
+      CGO_ENABLED: "1"
+      GOTOOLCHAIN: local
+    entrypoint: ["go", "test"]
+    command: ["./...","-count=1"]
+
+  build:
+    profiles: ["tools"]
+    image: cpa-plugin-codex-selective-ping-dev:local
+    working_dir: /src
+    volumes:
+      - .:/src
+    environment:
+      CGO_ENABLED: "1"
+      GOTOOLCHAIN: local
+    entrypoint: ["make"]
+    command: ["build-linux"]
