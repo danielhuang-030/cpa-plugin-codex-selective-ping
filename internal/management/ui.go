@@ -90,30 +90,34 @@ func RenderStatusPage(st StatusResponse, lang Lang) string {
 	if nextSlot != "" {
 		railNext = nextSlot
 	}
+	nowHHMM := time.Now().In(loadLoc(st.Timezone)).Format("15:04")
 	var timeline strings.Builder
 	for _, tm := range st.Times {
-		slotClass := "slot"
-		caption := t("slot_past")
-		if nextSlot != "" && tm == nextSlot {
-			slotClass = "slot next"
-			caption = t("slot_next")
+		slotClass, captionKey := rhythmSlot(tm, nextSlot, nowHHMM)
+		caption := ""
+		if captionKey != "" {
+			caption = t(captionKey)
 		}
 		fmt.Fprintf(&timeline, `<div class="%s" data-time="%s"><button class="x" type="button" aria-label="remove" onclick="removeTime('%s')">×</button><div class="t">%s</div><div class="caption">%s</div></div>`,
 			slotClass, html.EscapeString(tm), html.EscapeString(tm), html.EscapeString(tm), html.EscapeString(caption))
 	}
 	selectedN := 0
+	abnormalN := 0
 	for _, a := range st.Accounts {
 		if a.Selected {
 			selectedN++
+		}
+		if accountAbnormal(a) {
+			abnormalN++
 		}
 	}
 	var rows strings.Builder
 	for _, a := range st.Accounts {
 		checked := ""
-		cardClass := "acct"
+		cardClass := "acct-card"
 		if a.Selected {
 			checked = " checked"
-			cardClass = "acct selected"
+			cardClass = "acct-card selected"
 		}
 		statusChip := statusChipClass(a.Status)
 		metaParts := []string{}
@@ -126,8 +130,8 @@ func RenderStatusPage(st StatusResponse, lang Lang) string {
 <input type="checkbox" class="acct" data-id="%s"%s onchange="syncAcctCard(this)">
 <div><div class="name">%s</div><div class="meta">%s</div></div>
 <div class="hide-sm"><span class="chip" data-col="plan">%s</span></div>
-<div class="hide-sm"><div class="quota-label" data-i18n="col_5h">%s</div><div class="quota" data-col="five_hour">%s</div></div>
-<div class="hide-sm"><div class="quota-label" data-i18n="col_weekly">%s</div><div class="quota" data-col="weekly">%s</div></div>
+<div class="hide-sm"><div class="quota-label" data-i18n="col_5h">%s</div><div class="quota" data-col="five_hour">%s</div>%s</div>
+<div class="hide-sm"><div class="quota-label" data-i18n="col_weekly">%s</div><div class="quota" data-col="weekly">%s</div>%s</div>
 <span class="chip %s" data-col="status">%s</span>
 </div>`,
 			cardClass,
@@ -135,8 +139,8 @@ func RenderStatusPage(st StatusResponse, lang Lang) string {
 			html.EscapeString(preferID(a)), checked,
 			html.EscapeString(a.Name), meta,
 			dash(a.Plan),
-			html.EscapeString(t("col_5h")), formatWindow(a.FiveHour, lang),
-			html.EscapeString(t("col_weekly")), formatWindow(a.Weekly, lang),
+			html.EscapeString(t("col_5h")), formatWindow(a.FiveHour, lang), quotaBarHTML(a.FiveHour),
+			html.EscapeString(t("col_weekly")), formatWindow(a.Weekly, lang), quotaBarHTML(a.Weekly),
 			statusChip, html.EscapeString(orDash(a.Status)),
 		)
 	}
@@ -167,6 +171,9 @@ func RenderStatusPage(st StatusResponse, lang Lang) string {
 		}
 		big := fmt.Sprintf("%d %s", lr.Succeeded, t("chip_ok"))
 		metaLine := fmt.Sprintf("%s: %s · %s<br/>%s %d · %s %d", html.EscapeString(t("chip_mode")), html.EscapeString(lr.Mode), html.EscapeString(lr.At.Format("15:04")), html.EscapeString(t("chip_limited")), lr.Limited, html.EscapeString(t("chip_skipped")), lr.Skipped)
+		if lr.Failed > 0 {
+			metaLine += fmt.Sprintf(" · %s %d", html.EscapeString(t("chip_failed")), lr.Failed)
+		}
 		lastBlock = fmt.Sprintf(`<div class="run"><div class="run-summary"><div class="label" data-i18n="last_run_receipt_label">%s</div><div class="big">%s</div><div class="meta">%s</div></div><div class="run-list">%s</div></div>`,
 			html.EscapeString(t("last_run_receipt_label")), html.EscapeString(big), metaLine, lrRows.String())
 		if lr.Message != "" {
@@ -223,9 +230,10 @@ func RenderStatusPage(st StatusResponse, lang Lang) string {
     margin: 0; background: var(--bg); color: var(--ink);
     font-family: var(--ui); line-height: 1.45;
   }
-
-
-
+  .shell {
+    max-width: 1180px; margin: 0 auto; padding: 20px 16px 48px;
+    display: grid; grid-template-columns: 280px 1fr; gap: 18px;
+  }
   @media (max-width: 960px) {
     .shell { grid-template-columns: 1fr }
   }
@@ -262,6 +270,9 @@ func RenderStatusPage(st StatusResponse, lang Lang) string {
     display:inline-flex; align-items:center; gap:6px;
     padding: 6px 10px; border-radius: 999px;
     background: var(--ok-bg); color: var(--ok); font-size: 12px; font-weight: 700;
+  }
+  .status-pill.warn, .status-pill.off, .status-pill.neutral {
+    background: var(--chip); color: var(--ink-soft);
   }
   .status-pill i {
     width:8px; height:8px; border-radius:50%%; background: currentColor; display:inline-block;
@@ -331,7 +342,7 @@ func RenderStatusPage(st StatusResponse, lang Lang) string {
   }
   .tab.on { background: var(--ink); color: var(--panel); border-color: var(--ink) }
   .account-grid { display:grid; gap: 10px }
-  .acct {
+  .acct-card {
     display:grid;
     grid-template-columns: 28px 1.4fr .7fr .8fr .8fr auto;
     gap: 10px; align-items: center;
@@ -341,15 +352,15 @@ func RenderStatusPage(st StatusResponse, lang Lang) string {
     background: var(--bg);
   }
   @media (max-width: 900px) {
-    .acct { grid-template-columns: 28px 1fr; }
-    .acct .hide-sm { display:none }
+    .acct-card { grid-template-columns: 28px 1fr; }
+    .acct-card .hide-sm { display:none }
   }
-  .acct.selected {
+  .acct-card.selected {
     background: color-mix(in srgb, var(--accent-2) 10%%, var(--panel));
     border-color: color-mix(in srgb, var(--accent-2) 45%%, var(--line));
   }
-  .acct .name { font-weight: 750; font-size: 14px }
-  .acct .meta { color: var(--ink-soft); font-size: 11px; margin-top: 2px; font-family: var(--mono) }
+  .acct-card .name { font-weight: 750; font-size: 14px }
+  .acct-card .meta { color: var(--ink-soft); font-size: 11px; margin-top: 2px; font-family: var(--mono) }
   .bar {
     height: 7px; border-radius: 99px; background: var(--chip); overflow: hidden; margin-top: 5px;
   }
@@ -390,6 +401,7 @@ func RenderStatusPage(st StatusResponse, lang Lang) string {
   .empty strong { display:block; font-family: var(--sans); font-size: 20px; margin-bottom: 6px }
   .empty p { margin: 0 0 12px; color: var(--ink-soft); font-size: 13px }
   .hidden { display:none !important }
+  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center }
   .foot { text-align:center; color: var(--ink-soft); font-size: 11px; margin-top: 8px }
   .lang-switch{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0 12px}
   .lang-switch a{color:var(--ink-soft);text-decoration:none;font-size:12px;padding:4px 8px;border-radius:999px;border:1px solid var(--line)}
@@ -413,7 +425,7 @@ func RenderStatusPage(st StatusResponse, lang Lang) string {
     <a href="?lang=en" class="%s" data-lang="en">%s</a>
     <a href="?lang=ja" class="%s" data-lang="ja">%s</a>
   </nav>
-  <div class="status-pill"><i></i> %s · v%s</div>
+  <div class="status-pill %s"><i></i> %s · v%s</div>
   <div class="rail-block">
     <h3 data-i18n="rail_now">%s</h3>
     <div class="metric"><span class="k" data-i18n="next_run">%s</span><span class="v">%s</span></div>
@@ -453,7 +465,7 @@ func RenderStatusPage(st StatusResponse, lang Lang) string {
 <section class="panel" id="sec-principles" style="background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 16%%, var(--panel)), var(--panel));">
 <h2 data-i18n="principles_title">%s</h2>
 <p class="sub" data-i18n="principles_body">%s</p>
-<div class="metric"><span class="k" data-i18n="status">%s</span><span class="v"><span class="chip ok">%s</span></span></div>
+<div class="metric"><span class="k" data-i18n="status">%s</span><span class="v"><span class="chip %s">%s</span></span></div>
 <div class="metric"><span class="k" data-i18n="col_5h">%s</span><span class="v" data-i18n="principles_quota">%s</span></div>
 <div class="metric"><span class="k" data-i18n="last_run">%s</span><span class="v" data-i18n="principles_persist">%s</span></div>
 </section>
@@ -616,20 +628,35 @@ document.querySelectorAll('.lang-switch a[data-lang]').forEach(function(a){
     location.assign(u.toString());
   });
 });
+function nowHHMM(){
+  try{
+    const tz=(document.getElementById('tz')||{}).value||undefined;
+    const parts=new Intl.DateTimeFormat('en-GB',{timeZone:tz,hour:'2-digit',minute:'2-digit',hour12:false}).formatToParts(new Date());
+    const hh=(parts.find(p=>p.type==='hour')||{}).value||'00';
+    const mi=(parts.find(p=>p.type==='minute')||{}).value||'00';
+    return String(hh).padStart(2,'0')+':'+String(mi).padStart(2,'0');
+  }catch(e){
+    const d=new Date();
+    return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+  }
+}
 function renderTimes(){
   const el = document.getElementById('times');
   if(!el) return;
   el.innerHTML = '';
+  const now = nowHHMM();
   times.forEach((tm)=>{
     const d = document.createElement('div');
     const isNext = nextSlotHint && tm === nextSlotHint;
+    const isPast = !isNext && tm < now;
     d.className = isNext ? 'slot next' : 'slot';
     d.setAttribute('data-time', tm);
     const x = document.createElement('button');
     x.type='button'; x.className='x'; x.setAttribute('aria-label','remove'); x.textContent='×';
     x.onclick=()=>removeTime(tm);
     const tEl = document.createElement('div'); tEl.className='t'; tEl.textContent=tm;
-    const c = document.createElement('div'); c.className='caption'; c.textContent = isNext ? slotCaptionNext : slotCaptionPast;
+    const c = document.createElement('div'); c.className='caption';
+    c.textContent = isNext ? slotCaptionNext : (isPast ? slotCaptionPast : '');
     d.appendChild(x); d.appendChild(tEl); d.appendChild(c); el.appendChild(d);
   });
 }
@@ -644,13 +671,15 @@ function addTime(){
   if(!times.includes(n)) times.push(n);
   times.sort(); renderTimes();
 }
+let acctFilter='all';
 function setAll(v){
-  document.querySelectorAll('input.acct').forEach(c=>{ c.checked=v; syncAcctCard(c); });
+  document.querySelectorAll('input.acct').forEach(c=>{ c.checked=v; syncAcctCard(c, true); });
   const empty=document.getElementById('sec-accounts-empty');
   if(empty){ empty.classList.toggle('hidden', !!v && document.querySelectorAll('input.acct:checked').length>0); }
+  filterAccounts(acctFilter);
 }
-function syncAcctCard(cb){
-  const card=cb.closest('.acct[data-auth-index],div[data-auth-index]');
+function syncAcctCard(cb, skipFilter){
+  const card=cb.closest('.acct-card[data-auth-index],div[data-auth-index]');
   if(!card) return;
   card.classList.toggle('selected', cb.checked);
   card.setAttribute('data-selected', cb.checked ? 'true' : 'false');
@@ -659,15 +688,17 @@ function syncAcctCard(cb){
     const n=document.querySelectorAll('input.acct:checked').length;
     empty.classList.toggle('hidden', n>0);
   }
+  if(!skipFilter) filterAccounts(acctFilter);
 }
 function filterAccounts(mode){
-  document.querySelectorAll('.tabs .tab').forEach(t=>t.classList.toggle('on', t.getAttribute('data-filter')===mode));
+  if(mode) acctFilter=mode;
+  document.querySelectorAll('.tabs .tab').forEach(t=>t.classList.toggle('on', t.getAttribute('data-filter')===acctFilter));
   document.querySelectorAll('#account-grid > [data-auth-index]').forEach(card=>{
     const sel=card.getAttribute('data-selected')==='true';
     const abn=card.getAttribute('data-abnormal')==='true';
     let show=true;
-    if(mode==='selected') show=sel;
-    if(mode==='abnormal') show=abn;
+    if(acctFilter==='selected') show=sel;
+    if(acctFilter==='abnormal') show=abn;
     card.style.display = show ? '' : 'none';
   });
 }
@@ -698,12 +729,8 @@ async function runNow(){
 }
 function fmtQuotaWindow(w){
   if(!w) return '—';
-  const parts=[];
-  if(w.remaining!=null && w.remaining!=='') parts.push(('剩/left/残'.split('/')[0])+' '+w.remaining);
   // Keep labels minimal/numeric; server-rendered i18n already covers first paint.
-  if(w.remaining!=null) parts.push(String(w.remaining));
-  if(w.used!=null) parts.push('used '+w.used);
-  let main = parts.length ? (w.remaining!=null ? String(Number(w.remaining).toPrecision(4)).replace(/\.?0+$/,'') : ('used '+w.used)) : '—';
+  let main = '—';
   if(w.remaining!=null){
     const n=Number(w.remaining);
     main = (Number.isFinite(n)? n.toPrecision(4).replace(/\.?0+$/,'') : String(w.remaining));
@@ -788,10 +815,51 @@ function windowFromWham(usage, which){
   }
   return out;
 }
+function quotaBarClass(rem){
+  if(rem==null || !Number.isFinite(Number(rem))) return '';
+  const n=Number(rem);
+  if(n<=0) return 'bar bad';
+  if(n<50) return 'bar warn';
+  return 'bar';
+}
+function quotaBarWidth(rem){
+  if(rem==null || !Number.isFinite(Number(rem))) return 0;
+  const n=Math.max(0, Math.min(100, Number(rem)));
+  return n<=0 ? 2 : n;
+}
+function renderQuotaBar(parent, w){
+  if(!parent) return;
+  let bar=parent.querySelector('.bar');
+  let rem=null;
+  if(w){
+    if(w.remaining!=null) rem=Number(w.remaining);
+    else if(w.used!=null) rem=100-Number(w.used);
+  }
+  if(rem==null || !Number.isFinite(rem)){
+    if(bar) bar.remove();
+    return;
+  }
+  if(!bar){
+    bar=document.createElement('div');
+    parent.appendChild(bar);
+  }
+  bar.className=quotaBarClass(rem);
+  let span=bar.querySelector('span');
+  if(!span){ span=document.createElement('span'); bar.appendChild(span); }
+  span.style.width=quotaBarWidth(rem)+'%%';
+  parent.removeAttribute('data-bar-width');
+  bar.setAttribute('data-bar-width', String(quotaBarWidth(rem)));
+}
 function applyQuotaToRow(row, plan, five, weekly){
   if(plan){ const el=row.querySelector('[data-col="plan"]'); if(el) el.textContent=plan; }
-  if(five){ const el=row.querySelector('[data-col="five_hour"]'); if(el) el.innerHTML=fmtQuotaWindow(five); }
-  if(weekly){ const el=row.querySelector('[data-col="weekly"]'); if(el) el.innerHTML=fmtQuotaWindow(weekly); }
+  if(five){
+    const el=row.querySelector('[data-col="five_hour"]');
+    if(el){ el.innerHTML=fmtQuotaWindow(five); renderQuotaBar(el.parentElement, five); }
+  }
+  if(weekly){
+    const el=row.querySelector('[data-col="weekly"]');
+    if(el){ el.innerHTML=fmtQuotaWindow(weekly); renderQuotaBar(el.parentElement, weekly); }
+  }
 }
 async function enrichQuotaFromManagement(){
   const k=key();
@@ -864,6 +932,7 @@ renderTimes();
 		langActive(lang, LangZhHant), html.EscapeString(t("lang_zh")),
 		langActive(lang, LangEn), html.EscapeString(t("lang_en")),
 		langActive(lang, LangJa), html.EscapeString(t("lang_ja")),
+		statusPillClass(st.Enabled),
 		html.EscapeString(enabled), html.EscapeString(st.Version),
 		html.EscapeString(t("rail_now")),
 		html.EscapeString(t("next_run")), html.EscapeString(railNext),
@@ -887,14 +956,14 @@ renderTimes();
 		html.EscapeString(t("enable")),
 		html.EscapeString(t("principles_title")),
 		html.EscapeString(t("principles_body")),
-		html.EscapeString(t("status")), html.EscapeString(enabled),
+		html.EscapeString(t("status")), principlesChipClass(st.Enabled), html.EscapeString(enabled),
 		html.EscapeString(t("col_5h")), html.EscapeString(t("principles_quota")),
 		html.EscapeString(t("last_run")), html.EscapeString(t("principles_persist")),
 		html.EscapeString(t("accounts_who_title")),
 		html.EscapeString(t("accounts_hint")),
 		html.EscapeString(fmt.Sprintf(t("filter_all"), len(st.Accounts))),
 		html.EscapeString(fmt.Sprintf(t("filter_selected"), selectedN)),
-		html.EscapeString(t("filter_abnormal")),
+		html.EscapeString(fmt.Sprintf(t("filter_abnormal"), abnormalN)),
 		html.EscapeString(t("select_all")),
 		html.EscapeString(t("clear")),
 		html.EscapeString(banner),
@@ -969,6 +1038,67 @@ func orDash(s string) string {
 		return "—"
 	}
 	return s
+}
+
+
+func statusPillClass(enabled bool) string {
+	if enabled {
+		return ""
+	}
+	return "neutral"
+}
+
+// principlesChipClass matches status-pill tone: ok when enabled, neutral chip when off.
+func principlesChipClass(enabled bool) string {
+	if enabled {
+		return "ok"
+	}
+	return ""
+}
+
+// rhythmSlot classifies a HH:MM slot relative to next and current local time.
+// Upcoming non-next slots return captionKey "" (not slot_past).
+func rhythmSlot(tm, nextSlot, nowHHMM string) (class, captionKey string) {
+	if nextSlot != "" && tm == nextSlot {
+		return "slot next", "slot_next"
+	}
+	if nowHHMM != "" && tm < nowHHMM {
+		return "slot", "slot_past"
+	}
+	return "slot", ""
+}
+
+// quotaRemainingPct returns remaining percent when parseable from Remaining or Used.
+func quotaRemainingPct(w *hostapi.QuotaWindow) (float64, bool) {
+	if w == nil {
+		return 0, false
+	}
+	if w.Remaining != nil {
+		return *w.Remaining, true
+	}
+	if w.Used != nil {
+		return 100 - *w.Used, true
+	}
+	return 0, false
+}
+
+func quotaBarHTML(w *hostapi.QuotaWindow) string {
+	rem, ok := quotaRemainingPct(w)
+	if !ok {
+		return ""
+	}
+	width := rem
+	class := "bar"
+	if rem <= 0 {
+		class = "bar bad"
+		width = 2
+	} else if rem < 50 {
+		class = "bar warn"
+	}
+	if width > 100 {
+		width = 100
+	}
+	return fmt.Sprintf(`<div class="%s" data-bar-width="%.4g"><span style="width:%.4g%%"></span></div>`, class, width, width)
 }
 
 func formatWindow(w *hostapi.QuotaWindow, lang Lang) string {

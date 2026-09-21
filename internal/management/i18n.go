@@ -154,7 +154,7 @@ var catalogs = map[Lang]map[string]string{
 		"accounts_empty_cta": "去選帳號",
 		"filter_all":         "全部 %d",
 		"filter_selected":    "已選 %d",
-		"filter_abnormal":    "異常",
+		"filter_abnormal":    "異常 %d",
 
 		"banner_selected":    "目前已勾選 %d / %d 個帳號。未勾選的不會被排程或「立刻執行」打到。",
 		"banner_empty":       "帳號白名單為空：排程與立刻執行都不會 ping 任何人。",
@@ -239,7 +239,7 @@ var catalogs = map[Lang]map[string]string{
 		"accounts_empty_cta": "Choose accounts",
 		"filter_all":         "All %d",
 		"filter_selected":    "Selected %d",
-		"filter_abnormal":    "Abnormal",
+		"filter_abnormal":    "Abnormal %d",
 
 		"banner_selected":    "%d / %d accounts selected. Unchecked accounts are skipped by the schedule and Run now.",
 		"banner_empty":       "Account allowlist is empty: neither the schedule nor Run now will ping anyone.",
@@ -325,7 +325,7 @@ var catalogs = map[Lang]map[string]string{
 		"accounts_empty_cta": "アカウントを選ぶ",
 		"filter_all":         "すべて %d",
 		"filter_selected":    "選択 %d",
-		"filter_abnormal":    "異常",
+		"filter_abnormal":    "異常 %d",
 
 		"banner_selected":    "現在 %d / %d アカウントを選択中。未選択はスケジュールと「今すぐ実行」の対象外です。",
 		"banner_empty":       "アカウント許可リストが空です。スケジュールも今すぐ実行も誰にも ping しません。",

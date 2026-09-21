@@ -209,11 +209,21 @@ func TestRenderStatusPageAccountCards(t *testing.T) {
 	if !strings.Contains(html, `class="account-grid"`) {
 		t.Fatal("missing account-grid")
 	}
-	if !strings.Contains(html, `class="acct`) {
-		t.Fatal("missing acct card")
+	if !strings.Contains(html, `class="acct-card`) {
+		t.Fatal("missing acct-card wrapper")
 	}
-	if !strings.Contains(html, `class="acct selected"`) && !strings.Contains(html, `class="acct selected `) {
-		t.Fatal("missing selected acct card")
+	if !strings.Contains(html, `class="acct-card selected"`) && !strings.Contains(html, `class="acct-card selected `) {
+		t.Fatal("missing selected acct-card")
+	}
+	if !strings.Contains(html, `type="checkbox" class="acct"`) && !strings.Contains(html, `class="acct" data-id=`) {
+		t.Fatal("checkbox must keep class=acct for JS selectors")
+	}
+	// Card CSS must target .acct-card, not collide with input.acct
+	if !strings.Contains(html, ".acct-card{") && !strings.Contains(html, ".acct-card {") {
+		t.Fatal("CSS must style .acct-card")
+	}
+	if strings.Contains(html, ".acct{") || strings.Contains(html, ".acct {") {
+		t.Fatal("CSS must not use bare .acct{ (collides with checkbox)")
 	}
 }
 
@@ -226,8 +236,11 @@ func TestRenderStatusPageAccountsEmptyState(t *testing.T) {
 		},
 		AccountsConfig: []string{},
 	}, LangZhHant)
-	if !strings.Contains(html, `id="sec-accounts-empty"`) && !strings.Contains(html, `data-i18n="accounts_empty_title"`) {
-		t.Fatal("missing empty whitelist empty-state")
+	if !strings.Contains(html, `id="sec-accounts-empty"`) {
+		t.Fatal("missing id=sec-accounts-empty")
+	}
+	if !strings.Contains(html, `data-i18n="accounts_empty_title"`) {
+		t.Fatal("missing data-i18n=accounts_empty_title")
 	}
 }
 
@@ -268,13 +281,32 @@ func TestRenderStatusPageLastRunReceipt(t *testing.T) {
 	}
 }
 
+func TestRenderStatusPageLastRunReceiptShowsFailed(t *testing.T) {
+	html := RenderStatusPage(StatusResponse{
+		Enabled: true, Version: "0.1.5", Model: "gpt-5.4",
+		Timezone: "Asia/Taipei", Times: []string{"21:00"},
+		LastRun: &runstate.Summary{
+			Mode: "manual", Succeeded: 0, Limited: 0, Skipped: 0, Failed: 2,
+		},
+	}, LangZhHant)
+	if !strings.Contains(html, "失敗") && !strings.Contains(html, "failed") {
+		t.Fatal("receipt must include failed count label when Failed>0")
+	}
+	if !strings.Contains(html, "2") {
+		t.Fatal("receipt must show failed count value")
+	}
+}
+
 func TestRenderStatusPageLastRunEmpty(t *testing.T) {
 	html := RenderStatusPage(StatusResponse{
 		Enabled: true, Version: "0.1.5", Model: "gpt-5.4",
 		Timezone: "Asia/Taipei", Times: []string{"21:00"},
 	}, LangZhHant)
-	if !strings.Contains(html, `id="sec-last-empty"`) && !strings.Contains(html, `data-i18n="last_run_empty_title"`) {
-		t.Fatal("missing empty last-run state")
+	if !strings.Contains(html, `id="sec-last-empty"`) {
+		t.Fatal("missing id=sec-last-empty")
+	}
+	if !strings.Contains(html, `data-i18n="last_run_empty_title"`) {
+		t.Fatal("missing data-i18n=last_run_empty_title")
 	}
 }
 
@@ -289,5 +321,188 @@ func TestRenderStatusPageWarmCSSTokens(t *testing.T) {
 		if !strings.Contains(html, want) {
 			t.Fatalf("warm CSS / landmark missing %q", want)
 		}
+	}
+	// Base .shell rule must exist in CSS (not only HTML class / media override).
+	if !strings.Contains(html, ".shell{") && !strings.Contains(html, ".shell {") {
+		t.Fatal("CSS must contain .shell{ rule")
+	}
+	if !strings.Contains(html, "grid-template-columns: 280px 1fr") && !strings.Contains(html, "grid-template-columns:280px 1fr") {
+		t.Fatal("CSS .shell must set grid-template-columns: 280px 1fr")
+	}
+	if !strings.Contains(html, "max-width: 1180px") && !strings.Contains(html, "max-width:1180px") {
+		t.Fatal("CSS .shell must set max-width: 1180px")
+	}
+}
+
+func TestRenderStatusPageQuotaBars(t *testing.T) {
+	okRem := 62.0
+	warnRem := 18.0
+	badRem := 0.0
+	html := RenderStatusPage(StatusResponse{
+		Enabled: true, Version: "0.1.5", Model: "gpt-5.4",
+		Timezone: "Asia/Taipei", Times: []string{"21:00"},
+		Accounts: []runstate.AccountView{
+			{AuthIndex: "1", Name: "alice", Selected: true, FiveHour: &hostapi.QuotaWindow{Remaining: &okRem}, Weekly: &hostapi.QuotaWindow{Remaining: &okRem}},
+			{AuthIndex: "2", Name: "bob", Selected: false, FiveHour: &hostapi.QuotaWindow{Remaining: &warnRem}},
+			{AuthIndex: "3", Name: "spare", Selected: false, FiveHour: &hostapi.QuotaWindow{Remaining: &badRem}},
+		},
+	}, LangZhHant)
+	if !strings.Contains(html, `class="bar"`) && !strings.Contains(html, `class="bar `) {
+		t.Fatal("missing .bar markup when quota parseable")
+	}
+	if !strings.Contains(html, `width:62%`) && !strings.Contains(html, `width:62.`) {
+		t.Fatal("bar width should reflect remaining percent")
+	}
+	if !strings.Contains(html, `class="bar warn"`) {
+		t.Fatal("low remaining should use bar.warn")
+	}
+	if !strings.Contains(html, `class="bar bad"`) {
+		t.Fatal("zero remaining should use bar.bad")
+	}
+	// Enrich path must update bars (helper name or style.width / className=bar)
+	if !strings.Contains(html, "applyQuotaToRow") {
+		t.Fatal("missing applyQuotaToRow")
+	}
+	hasBarUpdate := strings.Contains(html, "quotaBarClass") ||
+		strings.Contains(html, "renderQuotaBar") ||
+		strings.Contains(html, "updateQuotaBar") ||
+		strings.Contains(html, "setQuotaBar") ||
+		(strings.Contains(html, "className") && strings.Contains(html, "'bar")) ||
+		(strings.Contains(html, "className") && strings.Contains(html, `"bar`)) ||
+		strings.Contains(html, "data-bar-width") ||
+		strings.Contains(html, ".bar > span") ||
+		strings.Contains(html, "querySelector('.bar')") ||
+		strings.Contains(html, `querySelector(".bar")`)
+	if !hasBarUpdate {
+		t.Fatal("enrich JS should update bars or data attributes")
+	}
+}
+
+func TestRenderStatusPageStatusPillOffNeutral(t *testing.T) {
+	htmlOff := RenderStatusPage(StatusResponse{Enabled: false, Version: "0.1.5"}, LangZhHant)
+	if !strings.Contains(htmlOff, `status-pill warn`) && !strings.Contains(htmlOff, `status-pill off`) && !strings.Contains(htmlOff, `status-pill neutral`) {
+		t.Fatal("when schedule off, status-pill must use neutral/warn/off class")
+	}
+}
+
+func TestRenderStatusPageAbnormalFilterCount(t *testing.T) {
+	html := RenderStatusPage(StatusResponse{
+		Enabled: true, Version: "0.1.5", Model: "gpt-5.4",
+		Timezone: "Asia/Taipei", Times: []string{"21:00"},
+		Accounts: []runstate.AccountView{
+			{AuthIndex: "1", Name: "alice", Selected: true, Status: "success"},
+			{AuthIndex: "2", Name: "bob", Selected: false, Status: "limited"},
+			{AuthIndex: "3", Name: "old", Selected: false, Status: "unavailable"},
+		},
+	}, LangZhHant)
+	if !strings.Contains(html, "異常 2") && !strings.Contains(html, "異常2") {
+		t.Fatalf("abnormal filter tab should show count; want 異常 2")
+	}
+}
+
+func TestRhythmSlotPastUpcomingNext(t *testing.T) {
+	// now=14:00, next=16:00 → 06 past, 16 next, 21 upcoming (not past)
+	cases := []struct {
+		tm, next, now string
+		wantClass     string
+		wantKey       string
+	}{
+		{"06:00", "16:00", "14:00", "slot", "slot_past"},
+		{"16:00", "16:00", "14:00", "slot next", "slot_next"},
+		{"21:00", "16:00", "14:00", "slot", ""},
+		{"11:00", "06:00", "22:00", "slot", "slot_past"}, // after next overnight: still past vs now
+		{"06:00", "06:00", "22:00", "slot next", "slot_next"},
+		{"21:00", "06:00", "22:00", "slot", "slot_past"},
+	}
+	for _, c := range cases {
+		gotClass, gotKey := rhythmSlot(c.tm, c.next, c.now)
+		if gotClass != c.wantClass || gotKey != c.wantKey {
+			t.Fatalf("rhythmSlot(%q,%q,%q)=(%q,%q) want (%q,%q)",
+				c.tm, c.next, c.now, gotClass, gotKey, c.wantClass, c.wantKey)
+		}
+	}
+}
+
+func TestFilterReapplyFromSyncAndSetAll(t *testing.T) {
+	html := RenderStatusPage(StatusResponse{Enabled: true, Times: []string{"21:00"}}, LangZhHant)
+	for _, want := range []string{
+		"let acctFilter=",
+		"filterAccounts(acctFilter)",
+		"function syncAcctCard(cb, skipFilter)",
+		"if(!skipFilter) filterAccounts(acctFilter)",
+	} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("missing filter re-apply hook %q", want)
+		}
+	}
+	// setAll must re-apply after bulk toggle
+	idx := strings.Index(html, "function setAll(v){")
+	if idx < 0 {
+		t.Fatal("missing setAll")
+	}
+	chunk := html[idx : idx+350]
+	if !strings.Contains(chunk, "filterAccounts(acctFilter)") {
+		t.Fatalf("setAll must call filterAccounts; chunk=%q", chunk)
+	}
+}
+
+func TestPrinciplesChipNeutralWhenScheduleOff(t *testing.T) {
+	htmlOn := RenderStatusPage(StatusResponse{Enabled: true, Version: "0.1.5"}, LangZhHant)
+	htmlOff := RenderStatusPage(StatusResponse{Enabled: false, Version: "0.1.5"}, LangZhHant)
+	if !strings.Contains(htmlOn, `class="chip ok"`) {
+		t.Fatal("principles status chip should be chip ok when schedule enabled")
+	}
+	// When off: principles chip must not hardcode chip ok for the status metric.
+	// Look near sec-principles for chip without ok.
+	sec := strings.Index(htmlOff, `id="sec-principles"`)
+	if sec < 0 {
+		t.Fatal("missing sec-principles")
+	}
+	chunk := htmlOff[sec:]
+	if end := strings.Index(chunk, `id="sec-accounts`); end > 0 {
+		chunk = chunk[:end]
+	}
+	if strings.Contains(chunk, `class="chip ok"`) {
+		t.Fatalf("when schedule off, principles chip must not be chip ok; chunk=%q", chunk)
+	}
+	if !strings.Contains(chunk, `class="chip "`) && !strings.Contains(chunk, `class="chip"`) {
+		// principlesChipClass("") → class="chip %s" with empty → class="chip "
+		t.Fatalf("expected neutral chip class in principles when off; chunk=%q", chunk)
+	}
+}
+
+func TestEnrichBarWidthOnBarNotParent(t *testing.T) {
+	html := RenderStatusPage(StatusResponse{Enabled: true}, LangZhHant)
+	if !strings.Contains(html, "bar.setAttribute('data-bar-width'") && !strings.Contains(html, `bar.setAttribute("data-bar-width"`) {
+		t.Fatal("enrich must set data-bar-width on .bar (SSR consistency)")
+	}
+	if strings.Contains(html, "parent.setAttribute('data-bar-width'") || strings.Contains(html, `parent.setAttribute("data-bar-width"`) {
+		t.Fatal("enrich must not set data-bar-width on parent hide-sm cell")
+	}
+	if strings.Contains(html, "剩/left/残") {
+		t.Fatal("fmtQuotaWindow must not contain dead leftover locale push")
+	}
+	if !strings.Contains(html, ".row { display:flex") && !strings.Contains(html, ".row{display:flex") {
+		t.Fatal("missing .row { display:flex } CSS for select-all gap")
+	}
+}
+
+func TestRenderStatusPageUpcomingSlotNotPastCaption(t *testing.T) {
+	// Force deterministic classification via helper already unit-tested; also assert page
+	// still emits slot_next for NextRun and does not force every non-next to 已過 in JS.
+	html := RenderStatusPage(StatusResponse{
+		Enabled:  true,
+		Timezone: "Asia/Taipei",
+		Times:    []string{"06:00", "11:00", "16:00", "21:00"},
+		NextRun:  "16:00",
+	}, LangZhHant)
+	if !strings.Contains(html, `data-time="16:00"`) {
+		t.Fatal("missing 16:00 slot")
+	}
+	if !strings.Contains(html, "isPast ? slotCaptionPast") && !strings.Contains(html, "isPast?slotCaptionPast") {
+		t.Fatal("JS renderTimes must only use past caption when isPast")
+	}
+	if !strings.Contains(html, "tm < now") {
+		t.Fatal("JS must compare slot time to now for past detection")
 	}
 }
