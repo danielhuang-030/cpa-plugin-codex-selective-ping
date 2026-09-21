@@ -8,7 +8,7 @@ import (
 
 const (
 	pluginName = "codex-selective-ping"
-	version    = "0.1.0"
+	version    = "0.1.1"
 )
 
 func configFields(cfg config.Config) []map[string]any {
@@ -24,9 +24,12 @@ func registrationMeta(cfg config.Config) map[string]any {
 	return map[string]any{
 		"schema_version": 5,
 		"metadata": map[string]any{
-			"Name": pluginName, "Version": version, "Author": "danielhuang",
-			"Description": "Selectively ping configured Codex OAuth accounts on a daily schedule.",
-			"ConfigFields": configFields(cfg),
+			"Name":             pluginName,
+			"Version":          version,
+			"Author":           "danielhuang-030",
+			"GitHubRepository": "https://github.com/danielhuang-030/cpa-plugin-codex-selective-ping",
+			"Description":      "Selectively ping configured Codex OAuth accounts on a daily schedule.",
+			"ConfigFields":     configFields(cfg),
 		},
 		"capabilities": map[string]any{"management_api": true},
 	}

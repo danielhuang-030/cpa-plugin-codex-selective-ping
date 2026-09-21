@@ -1,6 +1,7 @@
 package main
 
 import (
+	"strings"
 	"testing"
 
 	"cpa-plugin-codex-selective-ping/internal/config"
@@ -48,5 +49,23 @@ func TestRegistrationMetaIncludesTimezoneTimesAccounts(t *testing.T) {
 		if !names[want] {
 			t.Fatalf("missing field %q", want)
 		}
+	}
+}
+
+func TestRegistrationMetaRequiredByHost(t *testing.T) {
+	meta := registrationMeta(config.DefaultConfig())
+	md, ok := meta["metadata"].(map[string]any)
+	if !ok {
+		t.Fatalf("metadata type %T", meta["metadata"])
+	}
+	for _, key := range []string{"Name", "Version", "Author", "GitHubRepository"} {
+		v, ok := md[key].(string)
+		if !ok || strings.TrimSpace(v) == "" {
+			t.Fatalf("metadata.%s must be non-empty string, got %#v", key, md[key])
+		}
+	}
+	caps, ok := meta["capabilities"].(map[string]any)
+	if !ok || caps["management_api"] != true {
+		t.Fatalf("capabilities.management_api want true, got %#v", meta["capabilities"])
 	}
 }
