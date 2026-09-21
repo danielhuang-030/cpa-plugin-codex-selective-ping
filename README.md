@@ -114,3 +114,13 @@ macOS:
 ```bash
 CGO_ENABLED=1 go build -buildmode=c-shared -o codex-selective-ping.dylib .
 ```
+
+## Releasing
+
+CPA’s plugin store shows `registry.json` → `version` for **uninstalled** plugins (it does not query GitHub latest until installed). When cutting a release, bump **all** of:
+
+1. `Makefile` `VERSION`
+2. `registration.go` `version`
+3. `registry.json` `plugins[0].version`
+
+Then run `make verify-version` before tagging.

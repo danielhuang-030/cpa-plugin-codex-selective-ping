@@ -114,3 +114,13 @@ macOS:
 ```bash
 CGO_ENABLED=1 go build -buildmode=c-shared -o codex-selective-ping.dylib .
 ```
+
+## リリース
+
+CPA プラグインストアは**未インストール**時、`registry.json` の `version` だけを表示します（GitHub latest はインストール後に照会）。リリース時は次を揃えてください：
+
+1. `Makefile` の `VERSION`
+2. `registration.go` の `version`
+3. `registry.json` の `plugins[0].version`
+
+タグ付け前に `make verify-version` を実行。

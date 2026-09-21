@@ -114,3 +114,13 @@ macOS：
 ```bash
 CGO_ENABLED=1 go build -buildmode=c-shared -o codex-selective-ping.dylib .
 ```
+
+## 發版
+
+CPA 插件商店在**未安裝**時只顯示 `registry.json` 的 `version`（不會查 GitHub latest；已安裝才會查並判斷是否可更新）。發版時請同步更新：
+
+1. `Makefile` 的 `VERSION`
+2. `registration.go` 的 `version`
+3. `registry.json` 的 `plugins[0].version`
+
+打 tag 前執行 `make verify-version`。
