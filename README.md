@@ -1,20 +1,31 @@
-# Codex Selective Ping (CPA plugin)
+# Codex Selective Ping
 
-[English](README.md) | [繁體中文](README.zh-Hant.md) | [日本語](README.ja.md)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![GitHub release](https://img.shields.io/github/v/release/danielhuang-030/cpa-plugin-codex-selective-ping)](https://github.com/danielhuang-030/cpa-plugin-codex-selective-ping/releases)
 
-Independent [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) plugin. Inspired by [`cpa-plugin-codex-auto-ping`](https://github.com/jiz4oh/cpa-plugin-codex-auto-ping), but it only pings accounts listed in `accounts`. An empty `accounts` list means nobody is pinged.
+[English](README.md) · [繁體中文](README.zh-Hant.md) · [日本語](README.ja.md)
 
-- Plugin ID: `codex-selective-ping`
-- Fixed model: `gpt-5.6-luna`
-- Config persistence: host `plugins.configs.codex-selective-ping`
-- Management UI: Traditional Chinese / English / Japanese (default follows the CPA Management Center language)
-- License: [MIT](LICENSE)
+A [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) (CPA) plugin that sends a small real Codex request only to accounts you list. Inspired by [`cpa-plugin-codex-auto-ping`](https://github.com/jiz4oh/cpa-plugin-codex-auto-ping); an empty `accounts` list means nobody is pinged.
 
-## Install
+## Features
 
-### 1. Add this plugin to CPA’s Plugin Store
+- **Allowlist only** — pings `accounts`; empty list → 0 attempts
+- **Fixed model** — `gpt-5.6-luna` (not configurable)
+- **Daily schedule** — IANA timezone + `HH:MM` times; does not ping on CPA startup
+- **Management UI** — Traditional Chinese / English / Japanese (follows CPA Management Center; override with `?lang=` / `?theme=`)
+- **Persisted last run** — `{CPA root}/data/codex-selective-ping/last_run.json` (never under `auth-dir` / `auths/`)
+- **Plugin ID** — `codex-selective-ping` · config key `plugins.configs.codex-selective-ping`
 
-Edit CPA’s main config file (usually `config.yaml` next to the CPA binary, or the path your deployment mounts). Under the top-level `plugins:` block, add this registry URL to `store-sources` (a list). The official store stays included automatically; this only adds an extra source.
+## Requirements
+
+- [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) with dynamic plugins enabled
+- Linux `amd64` for store / prebuilt `.so` installs (see [Development](#development) for other builds)
+
+## Installation
+
+### 1. Add the Plugin Store source
+
+Edit CPA’s main config (usually `config.yaml` next to the binary, or the path your deployment mounts). Under top-level `plugins:`, append this URL to `store-sources`. The official registry stays included; this only adds a custom source.
 
 ```yaml
 plugins:
@@ -22,30 +33,30 @@ plugins:
   dir: plugins
   store-sources:
     - "https://raw.githubusercontent.com/danielhuang-030/cpa-plugin-codex-selective-ping/main/registry.json"
-  # configs: ...  # see step 3; you can leave configs empty until after install
 ```
 
-Where it goes:
+Notes:
 
-- Same file as your other CPA settings (`port`, `auth-dir`, …), not a separate plugins-only file.
-- Sibling keys under `plugins:`: `enabled`, `dir`, `store-sources`, then later `configs`.
-- Do **not** nest `store-sources` under `configs`.
-- If `store-sources` already exists, append this URL as another list item; do not replace the whole list unless you intend to drop other custom sources.
+| Do | Don’t |
+| --- | --- |
+| Put `store-sources` next to `enabled` / `dir` / `configs` | Nest it under `plugins.configs` |
+| Use the same `config.yaml` as `port`, `auth-dir`, … | Use a separate “plugins-only” file |
+| Append the URL if `store-sources` already exists | Replace the whole list unless you mean to drop other sources |
 
-Save the file and **restart CPA** so the store reloads sources. In Management Center → Plugin Store you should see **Codex Selective Ping**. Install it from there.
+Save and **restart CPA**. In Management Center → Plugin Store, install **Codex Selective Ping**.
 
-The store downloads the GitHub release zip into CPA’s plugin directory (often `plugins/`). Example layout for the current release:
+The store unpacks the GitHub Release zip into CPA’s plugin directory (often `plugins/`):
 
 ```text
 codex-selective-ping_0.1.6_linux_amd64.zip
 └── codex-selective-ping.so
 ```
 
-Release assets must include a file named exactly `checksums.txt` (CPA looks up that name).
+Each release must include an asset named exactly `checksums.txt` (CPA looks up that name).
 
-### 2. Configure this plugin
+### 2. Configure the plugin
 
-Still in the same `config.yaml`, under `plugins.configs`, add (or merge) a key named exactly `codex-selective-ping`:
+In the same `config.yaml`, under `plugins.configs`, add a key named exactly `codex-selective-ping`:
 
 ```yaml
 plugins:
@@ -68,12 +79,7 @@ plugins:
         - "auth_index_or_name"
 ```
 
-- `accounts` matches `auth_index` (exact) or email / name / account (case-insensitive).
-- Empty `accounts` → scheduled and manual runs attempt 0 pings.
-- Does not ping on CPA startup; waits for the next configured time.
-- Last-run summary is persisted to `{CPA root}/data/codex-selective-ping/last_run.json` (parent of `plugins/`) so the Management UI keeps it after reload. Optional overrides: `data_dir`, `state_path` (relative paths use CPA cwd). Never written under `auth-dir` / `auths/`.
-
-Restart or reload CPA if needed, then open:
+Restart or reload CPA if needed, then open the status page:
 
 ```text
 GET /v0/resource/plugins/codex-selective-ping/status
@@ -81,7 +87,7 @@ GET /v0/resource/plugins/codex-selective-ping/status
 
 ### 3. Manual install (optional)
 
-If you are not using the store:
+Skip the store and build the shared library yourself:
 
 ```bash
 git clone https://github.com/danielhuang-030/cpa-plugin-codex-selective-ping.git
@@ -91,37 +97,53 @@ docker compose exec -T dev make build-linux
 cp package/codex-selective-ping.so /path/to/cpa/plugins/
 ```
 
-Then apply the `plugins.configs.codex-selective-ping` YAML above and restart CPA.
+Then apply the `plugins.configs.codex-selective-ping` block above and restart CPA.
+
+## Configuration reference
+
+| Key | Type | Description |
+| --- | --- | --- |
+| `enabled` | bool | Host plugin instance on/off (CPA lifecycle) |
+| `schedule_enabled` | bool | Daily schedule on/off; **Run now** still works when `false` |
+| `timezone` | string | IANA timezone (e.g. `Asia/Taipei`) |
+| `times` | string[] | One or more `HH:MM` values |
+| `accounts` | string[] | Allowlist: `auth_index` (exact) or email / name / account (case-insensitive). Empty → 0 pings |
+| `data_dir` | string | Optional. Directory for `last_run.json` (relative → CPA cwd) |
+| `state_path` | string | Optional. Full path to the last-run file (wins over `data_dir`) |
+
+Default last-run path: `{CPA root}/data/codex-selective-ping/last_run.json` (parent of `plugins/`).
 
 ## Management
 
-API:
+### Status page
 
 ```text
-GET  /v0/management/plugins/codex-selective-ping/status
-POST /v0/management/plugins/codex-selective-ping/run
-GET/PATCH /v0/management/plugins/codex-selective-ping/config
+GET /v0/resource/plugins/codex-selective-ping/status
 ```
 
-- `POST .../run` returns 202, or 409 if a run is already in progress.
-- Manual **Run now** still works when scheduled ping is disabled (`schedule_enabled: false`); only the daily schedule is stopped.
-- UI language follows CPA Management Center (`cli-proxy-language` / `Accept-Language`). Override with `?lang=zh-Hant|en|ja`. Unsupported locales fall back to Traditional Chinese. The plugin never writes CPA’s language key.
-- UI theme follows CPA (`cli-proxy-theme` / `cli-proxy-color-scheme` / `theme`, then `prefers-color-scheme`). Override with `?theme=light|dark`. Applies `data-theme` on `<html>`.
-- Quota columns (Plan / 5h / weekly): Plan comes from the Codex id_token (`chatgpt_plan_type`). With a Management Key the page also fills live 5h/weekly from CPA `auth-files` + `api-call` (same `wham/usage` path as CPA admin). Missing values stay "—" and are never estimated; quota is informational and does not affect ping selection.
+- Language: CPA Management Center (`cli-proxy-language` / `Accept-Language`); override `?lang=zh-Hant|en|ja` (unsupported → Traditional Chinese). This plugin never writes CPA’s language key.
+- Theme: CPA (`cli-proxy-theme` / `cli-proxy-color-scheme` / `theme`, then `prefers-color-scheme`); override `?theme=light|dark` (`data-theme` on `<html>`).
+- Quota columns (Plan / 5h / weekly): Plan from the Codex id_token (`chatgpt_plan_type`). With a Management Key, live 5h/weekly come from CPA `auth-files` + `api-call` (same `wham/usage` path as admin). Missing values show "—" (never estimated). Quota is informational and does not change who gets pinged.
 
-## Reference
+### Management API
 
-Schedule, ping, and host ABI behaviour follow [`jiz4oh/cpa-plugin-codex-auto-ping`](https://github.com/jiz4oh/cpa-plugin-codex-auto-ping). This project is independent; the differences are the account allowlist, management UI, and config persistence.
+```text
+GET        /v0/management/plugins/codex-selective-ping/status
+POST       /v0/management/plugins/codex-selective-ping/run
+GET/PATCH  /v0/management/plugins/codex-selective-ping/config
+```
 
-## Build & develop (optional)
+`POST .../run` returns **202**, or **409** if a run is already in progress.
 
-For contributors. End users can ignore this section if they install from the store.
+## Development
+
+For contributors. End users installing from the store can skip this section.
 
 ```bash
 docker compose up -d --build
 docker compose exec -T dev go test ./... -count=1
 docker compose exec -T dev make build-linux
-# outputs package/codex-selective-ping.so
+# → package/codex-selective-ping.so
 ```
 
 Locally:
@@ -139,16 +161,22 @@ CGO_ENABLED=1 go build -buildmode=c-shared -o codex-selective-ping.dylib .
 
 ## Releasing
 
-CPA’s plugin store shows `registry.json` → `version` for **uninstalled** plugins (it does not query GitHub latest until installed). When cutting a release, bump **all** of:
+CPA’s Plugin Store shows `registry.json` → `version` for **uninstalled** plugins (GitHub “latest” is queried only after install). When cutting a release, bump all of:
 
 1. `Makefile` `VERSION`
 2. `registration.go` `version`
 3. `registry.json` `plugins[0].version`
 
-Then run `make verify-version` before tagging. Each GitHub Release must ship:
+Run `make verify-version` before tagging. Each GitHub Release must include:
 
 - `codex-selective-ping_<version>_<goos>_<goarch>.zip`
-- `checksums.txt` (exact filename; do not use `checksums-<version>.txt` alone)
+- `checksums.txt` (exact filename; a lone `checksums-<version>.txt` is not enough)
+
+## Related projects
+
+- [`jiz4oh/cpa-plugin-codex-auto-ping`](https://github.com/jiz4oh/cpa-plugin-codex-auto-ping) — schedule / ping / host ABI reference; this project adds the allowlist, management UI, and config persistence
+- [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) — host
+- [CLIProxyAPI Plugins Store](https://github.com/router-for-me/CLIProxyAPI-Plugins-Store) — official registry format
 
 ## License
 

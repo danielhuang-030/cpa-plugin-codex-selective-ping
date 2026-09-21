@@ -1,20 +1,31 @@
-# Codex Selective Ping（CPA 插件）
+# Codex Selective Ping
 
-[English](README.md) | [繁體中文](README.zh-Hant.md) | [日本語](README.ja.md)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![GitHub release](https://img.shields.io/github/v/release/danielhuang-030/cpa-plugin-codex-selective-ping)](https://github.com/danielhuang-030/cpa-plugin-codex-selective-ping/releases)
 
-獨立的 [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) 插件。靈感來自 [`cpa-plugin-codex-auto-ping`](https://github.com/jiz4oh/cpa-plugin-codex-auto-ping)，但只 ping `accounts` 白名單裡的帳號。`accounts` 為空時，誰都不 ping。
+[English](README.md) · [繁體中文](README.zh-Hant.md) · [日本語](README.ja.md)
 
-- 插件 ID：`codex-selective-ping`
-- 固定模型：`gpt-5.6-luna`
-- 設定持久化：宿主 `plugins.configs.codex-selective-ping`
-- 管理 UI：繁體中文／英文／日文（預設對齊 CPA 管理中心語系）
-- 授權條款：[MIT](LICENSE)
+[CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI)（CPA）插件：只對你列入白名單的帳號送出小型真實 Codex 請求。靈感來自 [`cpa-plugin-codex-auto-ping`](https://github.com/jiz4oh/cpa-plugin-codex-auto-ping)；`accounts` 為空時，誰都不 ping。
+
+## 功能
+
+- **只 ping 白名單** — 依 `accounts`；空陣列 → attempted 為 0
+- **固定模型** — `gpt-5.6-luna`（不可設定）
+- **每日排程** — IANA 時區 + `HH:MM`；CPA 啟動時不會立刻 ping
+- **管理 UI** — 繁中／英文／日文（跟隨 CPA 管理中心；可用 `?lang=` / `?theme=` 覆寫）
+- **保留上次執行** — `{CPA 根目錄}/data/codex-selective-ping/last_run.json`（不會寫入 `auth-dir` / `auths/`）
+- **插件 ID** — `codex-selective-ping` · 設定鍵 `plugins.configs.codex-selective-ping`
+
+## 需求
+
+- 已啟用動態插件的 [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI)
+- 商店／預編譯 `.so` 安裝需 Linux `amd64`（其他平台見 [開發](#開發)）
 
 ## 安裝
 
-### 1. 把本插件加進 CPA 插件商店
+### 1. 加入插件商店來源
 
-編輯 CPA 主設定檔（通常是二進位旁的 `config.yaml`，或你部署時掛載的那個路徑）。在頂層的 `plugins:` 區塊裡，把下列 registry URL **加進** `store-sources`（陣列）。官方商店會一直保留；這裡只是多一個自訂來源。
+編輯 CPA 主設定檔（通常是二進位旁的 `config.yaml`，或部署時掛載的路徑）。在頂層 `plugins:` 下，把下列 URL **加進** `store-sources`。官方商店會保留；這裡只多一個自訂來源。
 
 ```yaml
 plugins:
@@ -22,30 +33,30 @@ plugins:
   dir: plugins
   store-sources:
     - "https://raw.githubusercontent.com/danielhuang-030/cpa-plugin-codex-selective-ping/main/registry.json"
-  # configs: ...  # 見步驟 2；安裝前可以先不寫 configs
 ```
 
-位置說明：
+注意：
 
-- 跟 `port`、`auth-dir` 等其他 CPA 設定寫在**同一個** `config.yaml`，不是另一個獨立檔。
-- 在 `plugins:` 底下，與 `enabled`、`dir`、`configs` **同層**；鍵名是 `store-sources`。
-- **不要**把 `store-sources` 寫進 `plugins.configs` 裡。
-- 若本來已有 `store-sources`，請在陣列再加一筆 URL，不要整段蓋掉（除非你故意要拿掉其他來源）。
+| 要這樣 | 不要這樣 |
+| --- | --- |
+| `store-sources` 與 `enabled` / `dir` / `configs` **同層** | 寫進 `plugins.configs` 裡 |
+| 與 `port`、`auth-dir` 等寫在**同一個** `config.yaml` | 另開「只有插件」的設定檔 |
+| 若已有 `store-sources`，在陣列再加一筆 | 整段蓋掉（除非故意拿掉其他來源） |
 
-存檔後**重啟 CPA**，讓商店重新載入來源。到管理中心 → 插件商店，應可看到 **Codex Selective Ping**，從那裡安裝即可。
+存檔後**重啟 CPA**。到管理中心 → 插件商店，安裝 **Codex Selective Ping**。
 
-商店會把 GitHub Release 的 zip 解到 CPA 插件目錄（常見為 `plugins/`）。目前版本範例：
+商店會把 GitHub Release zip 解到 CPA 插件目錄（常見為 `plugins/`）：
 
 ```text
 codex-selective-ping_0.1.6_linux_amd64.zip
 └── codex-selective-ping.so
 ```
 
-Release 資產必須有一個檔名剛好叫 `checksums.txt` 的檔案（CPA 只認這個名字）。
+每個 Release 必須有檔名剛好為 `checksums.txt` 的資產（CPA 只認這個名字）。
 
-### 2. 設定本插件
+### 2. 設定插件
 
-還是同一個 `config.yaml`，在 `plugins.configs` 下新增（或合併）鍵名剛好為 `codex-selective-ping` 的區塊：
+同一個 `config.yaml`，在 `plugins.configs` 下新增鍵名剛好為 `codex-selective-ping` 的區塊：
 
 ```yaml
 plugins:
@@ -68,12 +79,7 @@ plugins:
         - "auth_index_or_name"
 ```
 
-- `accounts` 可與 `auth_index`（精確）或 email／name／account（不分大小寫）匹配。
-- 空的 `accounts` → 排程與手動執行的 attempted 皆為 0。
-- CPA 啟動時不會立刻 ping，等到下一個設定時段才跑。
-- 最近一次執行摘要會寫入 `{CPA 根目錄}/data/codex-selective-ping/last_run.json`（`plugins/` 上一層），重載後管理頁仍可顯示。可選覆寫：`data_dir`、`state_path`（相對路徑相對 CPA 工作目錄）。不會寫入 `auth-dir` / `auths/`。
-
-必要時重啟或重載 CPA，然後開啟：
+必要時重啟或重載 CPA，然後開啟狀態頁：
 
 ```text
 GET /v0/resource/plugins/codex-selective-ping/status
@@ -81,7 +87,7 @@ GET /v0/resource/plugins/codex-selective-ping/status
 
 ### 3. 手動安裝（可選）
 
-若不用商店：
+不用商店時自行編譯：
 
 ```bash
 git clone https://github.com/danielhuang-030/cpa-plugin-codex-selective-ping.git
@@ -91,37 +97,53 @@ docker compose exec -T dev make build-linux
 cp package/codex-selective-ping.so /path/to/cpa/plugins/
 ```
 
-套用上方的 `plugins.configs.codex-selective-ping` YAML 後重啟 CPA。
+再套用上方的 `plugins.configs.codex-selective-ping` 並重啟 CPA。
+
+## 設定參考
+
+| 鍵 | 型別 | 說明 |
+| --- | --- | --- |
+| `enabled` | bool | 宿主插件實例開關（CPA 生命週期） |
+| `schedule_enabled` | bool | 每日排程開關；`false` 時「立刻執行」仍可用 |
+| `timezone` | string | IANA 時區（如 `Asia/Taipei`） |
+| `times` | string[] | 一個以上的 `HH:MM` |
+| `accounts` | string[] | 白名單：`auth_index`（精確）或 email／name／account（不分大小寫）。空 → 0 次 ping |
+| `data_dir` | string | 可選。`last_run.json` 所在目錄（相對路徑相對 CPA cwd） |
+| `state_path` | string | 可選。上次執行檔完整路徑（優先於 `data_dir`） |
+
+預設上次執行路徑：`{CPA 根目錄}/data/codex-selective-ping/last_run.json`（`plugins/` 上一層）。
 
 ## 管理
 
-API：
+### 狀態頁
 
 ```text
-GET  /v0/management/plugins/codex-selective-ping/status
-POST /v0/management/plugins/codex-selective-ping/run
-GET/PATCH /v0/management/plugins/codex-selective-ping/config
+GET /v0/resource/plugins/codex-selective-ping/status
 ```
 
-- `POST .../run` 回 202；若已在執行則 409。
-- 排程關閉（`schedule_enabled: false`）時，「立刻執行」仍可用，只是每日排程會停。
-- 資源頁語系跟隨 CPA 管理中心（`cli-proxy-language`／`Accept-Language`）。可用 `?lang=zh-Hant|en|ja` 覆蓋。不支援的語系退回繁體中文。本插件不會寫入 CPA 的語系鍵。
-- UI 主題跟隨 CPA（`cli-proxy-theme` 等），可用 `?theme=light|dark` 覆寫；套用 `data-theme` 於 `<html>`。
-- 額度欄（Plan／5h／週限）：Plan 來自 Codex id_token（`chatgpt_plan_type`）。輸入 Management Key 後，頁面會用 CPA `auth-files` + `api-call`（與管理中心相同的 `wham/usage`）補 5h／週限。沒有資料就顯示「—」，不會自己推估；額度只供參考，不影響是否 ping。
+- 語系：跟隨 CPA 管理中心（`cli-proxy-language`／`Accept-Language`）；`?lang=zh-Hant|en|ja` 可覆寫（不支援則繁中）。本插件不會寫入 CPA 語系鍵。
+- 主題：跟隨 CPA（`cli-proxy-theme` 等），`?theme=light|dark` 可覆寫（`<html data-theme>`）。
+- 額度欄（Plan／5h／週限）：Plan 來自 Codex id_token（`chatgpt_plan_type`）。有 Management Key 時，以 CPA `auth-files` + `api-call`（與管理中心相同的 `wham/usage`）補 5h／週限。缺資料顯示「—」，不推估；額度只供參考，不影響是否 ping。
 
-## 參考
+### Management API
 
-排程、ping 與宿主 ABI 語意對齊 [`jiz4oh/cpa-plugin-codex-auto-ping`](https://github.com/jiz4oh/cpa-plugin-codex-auto-ping)。本專案獨立；差異在帳號白名單、管理介面，以及設定如何持久化。
+```text
+GET        /v0/management/plugins/codex-selective-ping/status
+POST       /v0/management/plugins/codex-selective-ping/run
+GET/PATCH  /v0/management/plugins/codex-selective-ping/config
+```
 
-## 建置與開發（次要）
+`POST .../run` 回 **202**；若已在執行則 **409**。
 
-給貢獻者看。若用商店安裝，可略過。
+## 開發
+
+給貢獻者。用商店安裝的使用者可略過。
 
 ```bash
 docker compose up -d --build
 docker compose exec -T dev go test ./... -count=1
 docker compose exec -T dev make build-linux
-# 產出 package/codex-selective-ping.so
+# → package/codex-selective-ping.so
 ```
 
 本機：
@@ -139,7 +161,7 @@ CGO_ENABLED=1 go build -buildmode=c-shared -o codex-selective-ping.dylib .
 
 ## 發版
 
-CPA 插件商店在**未安裝**時只顯示 `registry.json` 的 `version`（不會查 GitHub latest；已安裝才會查並判斷是否可更新）。發版時請同步更新：
+CPA 插件商店在**未安裝**時只顯示 `registry.json` 的 `version`（安裝後才會查 GitHub latest）。發版時請同步更新：
 
 1. `Makefile` 的 `VERSION`
 2. `registration.go` 的 `version`
@@ -149,6 +171,12 @@ CPA 插件商店在**未安裝**時只顯示 `registry.json` 的 `version`（不
 
 - `codex-selective-ping_<version>_<goos>_<goarch>.zip`
 - `checksums.txt`（檔名必須剛好是這個；不要只上傳 `checksums-<version>.txt`）
+
+## 相關專案
+
+- [`jiz4oh/cpa-plugin-codex-auto-ping`](https://github.com/jiz4oh/cpa-plugin-codex-auto-ping) — 排程／ping／宿主 ABI 參考；本專案多了白名單、管理 UI 與設定持久化
+- [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) — 宿主
+- [CLIProxyAPI Plugins Store](https://github.com/router-for-me/CLIProxyAPI-Plugins-Store) — 官方 registry 格式
 
 ## 授權
 
