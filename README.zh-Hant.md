@@ -13,6 +13,40 @@
 
 本專案是全新獨立插件。排程、ping 與宿主 ABI 語意對齊 [`jiz4oh/cpa-plugin-codex-auto-ping`](https://github.com/jiz4oh/cpa-plugin-codex-auto-ping)；差異在帳號白名單、管理介面，以及設定如何持久化。
 
+## 安裝
+
+### 方式 A — CPA 插件商店（建議）
+
+1. 在 CPA 管理中心新增自訂插件來源：
+
+```text
+https://raw.githubusercontent.com/danielhuang-030/cpa-plugin-codex-selective-ping/main/registry.json
+```
+
+2. 從商店安裝 **Codex Selective Ping**。
+3. 把動態庫放到 CPA 的插件目錄（常見為 `plugins/`），或讓商店把 release zip 解到該處。Release 目錄範例：
+
+```text
+codex-selective-ping_0.1.0_linux_amd64.zip
+└── codex-selective-ping.so
+```
+
+4. 啟用 plugins 並加上設定（見下方），必要時重啟或重載 CPA。
+5. 開啟管理資源頁：`/v0/resource/plugins/codex-selective-ping/status`
+
+### 方式 B — 自行編譯後複製
+
+```bash
+git clone https://github.com/danielhuang-030/cpa-plugin-codex-selective-ping.git
+cd cpa-plugin-codex-selective-ping
+docker compose up -d --build
+docker compose exec -T dev make build-linux
+# 或：CGO_ENABLED=1 go build -buildmode=c-shared -o codex-selective-ping.so .
+cp package/codex-selective-ping.so /path/to/cpa/plugins/
+```
+
+接著設定 `plugins.enabled: true`、`plugins.dir` 指向該目錄，加入 `plugins.configs.codex-selective-ping`，並重啟 CPA。
+
 ## CPA 設定
 
 ```yaml

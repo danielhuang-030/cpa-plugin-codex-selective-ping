@@ -13,6 +13,40 @@
 
 本プロジェクトは新規の独立プラグインです。スケジュール、ping、ホスト ABI の意味は [`jiz4oh/cpa-plugin-codex-auto-ping`](https://github.com/jiz4oh/cpa-plugin-codex-auto-ping) に揃えています。違いはアカウント許可リスト、管理 UI、設定の保存方法です。
 
+## インストール
+
+### 方法 A — CPA プラグインストア（推奨）
+
+1. CPA 管理センターで、次のカスタムプラグインソースを追加します：
+
+```text
+https://raw.githubusercontent.com/danielhuang-030/cpa-plugin-codex-selective-ping/main/registry.json
+```
+
+2. ストアから **Codex Selective Ping** をインストールします。
+3. 共有ライブラリを CPA のプラグインディレクトリ（多くは `plugins/`）へ置くか、ストアに release zip を展開させます。Release の例：
+
+```text
+codex-selective-ping_0.1.0_linux_amd64.zip
+└── codex-selective-ping.so
+```
+
+4. plugins を有効化し、下記の設定を追加します。必要なら CPA を再起動／再読込してください。
+5. 管理リソースページを開きます：`/v0/resource/plugins/codex-selective-ping/status`
+
+### 方法 B — 自分でビルドしてコピー
+
+```bash
+git clone https://github.com/danielhuang-030/cpa-plugin-codex-selective-ping.git
+cd cpa-plugin-codex-selective-ping
+docker compose up -d --build
+docker compose exec -T dev make build-linux
+# または: CGO_ENABLED=1 go build -buildmode=c-shared -o codex-selective-ping.so .
+cp package/codex-selective-ping.so /path/to/cpa/plugins/
+```
+
+その後 `plugins.enabled: true` と `plugins.dir` を設定し、`plugins.configs.codex-selective-ping` を追加して CPA を再起動します。
+
 ## CPA 設定
 
 ```yaml

@@ -13,6 +13,40 @@ Independent [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) plugin. 
 
 This plugin is a new, independent project. Schedule, ping, and host ABI behaviour follow [`jiz4oh/cpa-plugin-codex-auto-ping`](https://github.com/jiz4oh/cpa-plugin-codex-auto-ping). The differences are the account allowlist, management UI, and config persistence.
 
+## Install
+
+### Option A — CPA Plugin Store (recommended)
+
+1. In CPA Management Center, add this custom plugin source:
+
+```text
+https://raw.githubusercontent.com/danielhuang-030/cpa-plugin-codex-selective-ping/main/registry.json
+```
+
+2. Install **Codex Selective Ping** from the store.
+3. Put the shared library under CPA’s plugin directory (often `plugins/`), or let the store place the release zip there. Release layout example:
+
+```text
+codex-selective-ping_0.1.0_linux_amd64.zip
+└── codex-selective-ping.so
+```
+
+4. Enable plugins and add config (see below), then restart or reload CPA if needed.
+5. Open the management resource page: `/v0/resource/plugins/codex-selective-ping/status`
+
+### Option B — Build and copy manually
+
+```bash
+git clone https://github.com/danielhuang-030/cpa-plugin-codex-selective-ping.git
+cd cpa-plugin-codex-selective-ping
+docker compose up -d --build
+docker compose exec -T dev make build-linux
+# or: CGO_ENABLED=1 go build -buildmode=c-shared -o codex-selective-ping.so .
+cp package/codex-selective-ping.so /path/to/cpa/plugins/
+```
+
+Then set `plugins.enabled: true`, point `plugins.dir` at that directory, add `plugins.configs.codex-selective-ping`, and restart CPA.
+
 ## CPA configuration
 
 ```yaml
