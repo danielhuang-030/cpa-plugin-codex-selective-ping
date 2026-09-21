@@ -31,7 +31,7 @@
 - Consumes: `RenderStatusPage(st StatusResponse, lang Lang) string`
 - Produces: HTML containing `class="shell"`, `class="rail"`, `class="workspace"`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```go
 func TestRenderStatusPageV3ShellLandmarks(t *testing.T) {
@@ -44,13 +44,13 @@ func TestRenderStatusPageV3ShellLandmarks(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `docker compose --profile tools run --rm test ./internal/management/ -count=1 -run TestRenderStatusPageV3ShellLandmarks`
 
 Expected: FAIL — missing `class="shell"` (or rail/workspace)
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Wrap existing page body in:
 
@@ -60,13 +60,13 @@ Wrap existing page body in:
 
 Move brand/status into rail; keep old sections temporarily inside workspace if needed — enough to pass landmark asserts.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `docker compose --profile tools run --rm test ./internal/management/ -count=1 -run TestRenderStatusPageV3ShellLandmarks`
 
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add internal/management/ui.go internal/management/ui_test.go
@@ -86,7 +86,7 @@ git commit -m "test+feat(ui): add v3 shell/rail/workspace landmarks"
 - Consumes: `st.Times []string`, `st.Timezone`, `st.Enabled`, `st.NextRun` (`interface{}` on `StatusResponse`)
 - Produces: markup with `class="timeline"`, each time as `class="slot"`, upcoming marked `class="slot next"`; keep `#schedule_enabled`, `#tz`, `#new-time`, `addTime()`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```go
 func TestRenderStatusPageRhythmTimeline(t *testing.T) {
@@ -110,13 +110,13 @@ func TestRenderStatusPageRhythmTimeline(t *testing.T) {
 
 (Adjust `NextRun` to the real `StatusResponse` field used today for “下次執行”.)
 
-- [ ] **Step 2: Run — expect FAIL** (`docker compose --profile tools run --rm test ./internal/management/ -count=1 -run TestRenderStatusPageRhythmTimeline`)
+- [x] **Step 2: Run — expect FAIL** (`docker compose --profile tools run --rm test ./internal/management/ -count=1 -run TestRenderStatusPageRhythmTimeline`)
 
-- [ ] **Step 3: Implement timeline rendering** matching mock: replace chip row with slot grid; compute next slot from status; keep add-time controls
+- [x] **Step 3: Implement timeline rendering** matching mock: replace chip row with slot grid; compute next slot from status; keep add-time controls
 
-- [ ] **Step 4: Run — expect PASS** (+ re-run Task 1 test)
+- [x] **Step 4: Run — expect PASS** (+ re-run Task 1 test)
 
-- [ ] **Step 5: Commit** `feat(ui): render schedule as rhythm timeline with next highlight`
+- [x] **Step 5: Commit** `feat(ui): render schedule as rhythm timeline with next highlight`
 
 ---
 
@@ -131,7 +131,7 @@ func TestRenderStatusPageRhythmTimeline(t *testing.T) {
 - Consumes: `st.Accounts` / allowlist selection fields already used by checkboxes (`preferID` / auth index)
 - Produces: `class="account-grid"`, each `class="acct"` (selected adds `selected`); when zero selected, show `id="sec-accounts-empty"` empty panel; keep checkbox values + `setAll`
 
-- [ ] **Step 1: Failing tests**
+- [x] **Step 1: Failing tests**
 
 ```go
 func TestRenderStatusPageAccountCards(t *testing.T) {
@@ -152,13 +152,13 @@ func TestRenderStatusPageAccountsEmptyState(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run — FAIL**
+- [x] **Step 2: Run — FAIL**
 
-- [ ] **Step 3: Replace `<table>` accounts block with card list + empty state; preserve `name`/value on checkboxes used by `selectedAccounts()`
+- [x] **Step 3: Replace `<table>` accounts block with card list + empty state; preserve `name`/value on checkboxes used by `selectedAccounts()`
 
-- [ ] **Step 4: PASS** + existing checkbox/auth-index tests still green
+- [x] **Step 4: PASS** + existing checkbox/auth-index tests still green
 
-- [ ] **Step 5: Commit** `feat(ui): account cards and empty whitelist state`
+- [x] **Step 5: Commit** `feat(ui): account cards and empty whitelist state`
 
 ---
 
@@ -171,7 +171,7 @@ func TestRenderStatusPageAccountsEmptyState(t *testing.T) {
 **Interfaces:**
 - Produces: `#management-key`, `onclick="saveCfg()"`, `onclick="runNow()"` inside `.rail` (or `.primary-stack`); primary save appears before run-now in HTML order
 
-- [ ] **Step 1: Failing test**
+- [x] **Step 1: Failing test**
 
 ```go
 func TestRenderStatusPageRailActionsOrder(t *testing.T) {
@@ -192,9 +192,9 @@ func TestRenderStatusPageRailActionsOrder(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2–4:** RED → move actions into rail with v3 button classes → GREEN; keep `TestRenderStatusPageSaveUsesScheduleEnabledNotEnabled` passing
+- [x] **Step 2–4:** RED → move actions into rail with v3 button classes → GREEN; keep `TestRenderStatusPageSaveUsesScheduleEnabledNotEnabled` passing
 
-- [ ] **Step 5: Commit** `feat(ui): move save/run/refresh into left rail with CTA order`
+- [x] **Step 5: Commit** `feat(ui): move save/run/refresh into left rail with CTA order`
 
 ---
 
@@ -209,11 +209,11 @@ func TestRenderStatusPageRailActionsOrder(t *testing.T) {
 - Consumes: existing last-run summary on `StatusResponse`
 - Produces: `class="run"` with `run-summary` when present; empty state when absent (already `no_last_run` — keep key or add new)
 
-- [ ] **Step 1: Failing tests** for `class="run-summary"` when last run set, and empty panel when nil
+- [x] **Step 1: Failing tests** for `class="run-summary"` when last run set, and empty panel when nil
 
-- [ ] **Step 2–4:** RED → implement receipt layout → GREEN
+- [x] **Step 2–4:** RED → implement receipt layout → GREEN
 
-- [ ] **Step 5: Commit** `feat(ui): receipt-style last run and empty state`
+- [x] **Step 5: Commit** `feat(ui): receipt-style last run and empty state`
 
 ---
 
@@ -223,11 +223,11 @@ func TestRenderStatusPageRailActionsOrder(t *testing.T) {
 - Modify: `internal/management/ui.go` (`<style>` block)
 - Modify: `internal/management/ui_test.go`
 
-- [ ] **Step 1: Failing test** asserting CSS contains warm token markers, e.g. `--accent:` and `data-theme="dark"` rules (or `:root[data-theme="dark"]`), and theme sync JS still present (`TestRenderStatusPageThemeSyncJS`)
+- [x] **Step 1: Failing test** asserting CSS contains warm token markers, e.g. `--accent:` and `data-theme="dark"` rules (or `:root[data-theme="dark"]`), and theme sync JS still present (`TestRenderStatusPageThemeSyncJS`)
 
-- [ ] **Step 2–4:** Port mock CSS into embedded stylesheet; map CPA theme attribute the page already uses; GREEN
+- [x] **Step 2–4:** Port mock CSS into embedded stylesheet; map CPA theme attribute the page already uses; GREEN
 
-- [ ] **Step 5: Commit** `feat(ui): apply v3 warm editorial CSS tokens`
+- [x] **Step 5: Commit** `feat(ui): apply v3 warm editorial CSS tokens`
 
 ---
 
@@ -237,11 +237,11 @@ func TestRenderStatusPageRailActionsOrder(t *testing.T) {
 - Modify: `internal/management/i18n.go`
 - Modify: `internal/management/i18n_test.go` (or add if missing)
 
-- [ ] **Step 1:** Test that every new `data-i18n` key used in `ui.go` exists for `zh` / `en` / `ja` maps
+- [x] **Step 1:** Test that every new `data-i18n` key used in `ui.go` exists for `zh` / `en` / `ja` maps
 
-- [ ] **Step 2–4:** RED → fill translations → GREEN
+- [x] **Step 2–4:** RED → fill translations → GREEN
 
-- [ ] **Step 5: Commit** `feat(i18n): strings for v3 management UI`
+- [x] **Step 5: Commit** `feat(i18n): strings for v3 management UI`
 
 ---
 
@@ -249,15 +249,15 @@ func TestRenderStatusPageRailActionsOrder(t *testing.T) {
 
 **Files:** none (verify)
 
-- [ ] **Step 1:** `docker compose --profile tools run --rm test` (full `./...`)
+- [x] **Step 1:** `docker compose --profile tools run --rm test` (full `./...`)
 
 Expected: all packages ok
 
-- [ ] **Step 2:** Manually spot-check rendered HTML fixture against mock landmarks (optional local file write under `/tmp`)
+- [x] **Step 2:** Manually spot-check rendered HTML fixture against mock landmarks (optional local file write under `/tmp`)
 
-- [ ] **Step 3:** Comment on GitHub issue #8 with commit SHAs + note behavior unchanged
+- [x] **Step 3:** Comment on GitHub issue #8 with commit SHAs + note behavior unchanged
 
-- [ ] **Step 4:** Commit only if docs/README screenshots need update; otherwise stop for human review before version bump
+- [x] **Step 4:** Commit only if docs/README screenshots need update; otherwise stop for human review before version bump
 
 ---
 
