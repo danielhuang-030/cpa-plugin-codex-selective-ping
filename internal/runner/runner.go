@@ -25,11 +25,11 @@ func (r *Runner) Run(parent context.Context, cfg config.Config, force bool) (run
 	if !r.State.TryBegin() {
 		return runstate.Summary{}, false
 	}
-	return r.runClaimed(parent, cfg, force), true
+	return r.RunClaimed(parent, cfg, force), true
 }
 
-// runClaimed assumes State.TryBegin already succeeded.
-func (r *Runner) runClaimed(parent context.Context, cfg config.Config, force bool) runstate.Summary {
+// RunClaimed assumes State.TryBegin already succeeded.
+func (r *Runner) RunClaimed(parent context.Context, cfg config.Config, force bool) runstate.Summary {
 	mode := "scheduled"
 	if force {
 		mode = "force"
