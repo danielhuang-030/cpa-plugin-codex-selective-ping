@@ -9,45 +9,24 @@
 - 設定の永続化: ホストの `plugins.configs.codex-selective-ping`
 - 管理 UI: 繁体字中国語 / 英語 / 日本語（既定は CPA 管理センターの言語に合わせる）
 
-## 参考
-
-本プロジェクトは新規の独立プラグインです。スケジュール、ping、ホスト ABI の意味は [`jiz4oh/cpa-plugin-codex-auto-ping`](https://github.com/jiz4oh/cpa-plugin-codex-auto-ping) に揃えています。違いはアカウント許可リスト、管理 UI、設定の保存方法です。
-
 ## インストール
 
-### 方法 A — CPA プラグインストア（推奨）
+### 1. プラグインストア（推奨）
 
-1. CPA 管理センターで、次のカスタムプラグインソースを追加します：
+CPA 管理センターで次のカスタムソースを追加し、**Codex Selective Ping** をインストールします：
 
 ```text
 https://raw.githubusercontent.com/danielhuang-030/cpa-plugin-codex-selective-ping/main/registry.json
 ```
 
-2. ストアから **Codex Selective Ping** をインストールします。
-3. 共有ライブラリを CPA のプラグインディレクトリ（多くは `plugins/`）へ置くか、ストアに release zip を展開させます。Release の例：
+共有ライブラリを CPA のプラグインディレクトリ（多くは `plugins/`）へ置くか、ストアに release zip を展開させます：
 
 ```text
 codex-selective-ping_0.1.0_linux_amd64.zip
 └── codex-selective-ping.so
 ```
 
-4. plugins を有効化し、下記の設定を追加します。必要なら CPA を再起動／再読込してください。
-5. 管理リソースページを開きます：`/v0/resource/plugins/codex-selective-ping/status`
-
-### 方法 B — 自分でビルドしてコピー
-
-```bash
-git clone https://github.com/danielhuang-030/cpa-plugin-codex-selective-ping.git
-cd cpa-plugin-codex-selective-ping
-docker compose up -d --build
-docker compose exec -T dev make build-linux
-# または: CGO_ENABLED=1 go build -buildmode=c-shared -o codex-selective-ping.so .
-cp package/codex-selective-ping.so /path/to/cpa/plugins/
-```
-
-その後 `plugins.enabled: true` と `plugins.dir` を設定し、`plugins.configs.codex-selective-ping` を追加して CPA を再起動します。
-
-## CPA 設定
+### 2. CPA を設定
 
 ```yaml
 plugins:
@@ -67,42 +46,52 @@ plugins:
         - "auth_index_or_name"
 ```
 
-意味:
-
 - `accounts` は `auth_index`（完全一致）または email / name / account（大文字小文字を区別しない）と照合します。
 - `accounts` が空 → スケジュール実行も手動実行も attempted は 0 です。
 - CPA 起動時には ping せず、次の設定時刻まで待ちます。
 
-## 管理
-
-リソースページ:
+必要なら CPA を再起動／再読込し、次を開きます：
 
 ```text
 GET /v0/resource/plugins/codex-selective-ping/status
 ```
+
+### 3. 手動インストール（任意）
+
+ストアを使わない場合：
+
+```bash
+git clone https://github.com/danielhuang-030/cpa-plugin-codex-selective-ping.git
+cd cpa-plugin-codex-selective-ping
+docker compose up -d --build
+docker compose exec -T dev make build-linux
+cp package/codex-selective-ping.so /path/to/cpa/plugins/
+```
+
+上記 YAML を適用して CPA を再起動してください。
+
+## 管理
 
 API:
 
 ```text
 GET  /v0/management/plugins/codex-selective-ping/status
 POST /v0/management/plugins/codex-selective-ping/run
-```
-
-UI からの保存はホスト経由です:
-
-```text
 GET/PATCH /v0/management/plugins/codex-selective-ping/config
 ```
 
-`POST .../run` は 202 を返します。実行中なら 409 です。スケジュールが無効（`enabled: false`）でも **今すぐ実行** は使えます。止まるのは日次スケジュールだけです。
+- `POST .../run` は 202。実行中なら 409 です。
+- スケジュールが無効（`enabled: false`）でも **今すぐ実行** は使えます。止まるのは日次スケジュールだけです。
+- リソースページの言語は CPA 管理センター（`cli-proxy-language` / `Accept-Language`）に従います。`?lang=zh-Hant|en|ja` で上書きできます。未対応ロケールは繁体字中国語に戻します。本プラグインは CPA の言語キーを書き込みません。
+- クォータ列（Plan / 5h / 週次）はホスト提供値のみ。無い場合は「—」。
 
-リソースページの言語は CPA 管理センター（`cli-proxy-language` / `Accept-Language`）に従います。`?lang=zh-Hant|en|ja` で上書きできます。未対応のロケールは繁体字中国語に戻します。本プラグインは CPA の言語キーを書き込みません。
+## 参考
 
-クォータ列（Plan / 5h / 週次）はホストが提供した値だけを表示し、無い場合は「—」です。
+スケジュール、ping、ホスト ABI の意味は [`jiz4oh/cpa-plugin-codex-auto-ping`](https://github.com/jiz4oh/cpa-plugin-codex-auto-ping) に揃えています。本プロジェクトは独立しており、違いはアカウント許可リスト、管理 UI、設定の保存方法です。
 
-## ビルド
+## ビルドと開発（二次情報）
 
-Docker Compose（Go 1.24 + gcc/CGO）を推奨します:
+コントリビューター向け。ストアから入れる場合はスキップして構いません。
 
 ```bash
 docker compose up -d --build
@@ -122,12 +111,4 @@ macOS:
 
 ```bash
 CGO_ENABLED=1 go build -buildmode=c-shared -o codex-selective-ping.dylib .
-```
-
-共有ライブラリを CPA のプラグインディレクトリへコピーしてください。
-
-## 開発
-
-```bash
-docker compose exec -T dev go test ./...
 ```
