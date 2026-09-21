@@ -98,6 +98,10 @@ plugins:
 1. 概況：啟用、版本、模型、時區、時段、下次執行、是否執行中
 2. 排程：時區、時段增刪
 3. 帳號：列表 + checkbox；全選／清除；未勾選明確提示不會 ping
+   - **額度欄（本規格增補）**：盡可能顯示 CPA 已提供的 Codex **5h** 與 **週限** 資訊（剩餘／用量、reset／到期時間、plan 若有）
+   - 資料來源優先序：宿主 Management `auth-files`／runtime 已暴露的 quota 欄位（如 PR #3068／後續 observe quota）；若插件 ABI 有 `host.auth.get_runtime` 則一併讀取
+   - **有就顯示、沒有就顯示「—」**；不自行推算或捏造剩餘量
+   - 額度欄為唯讀資訊，不影響 Selector（選不選仍只看 `accounts` 白名單）；排程仍依本插件規則，不因 UI 顯示而改 CPA 冷卻邏輯
 4. 動作：Management Key、儲存設定、立刻執行、最近結果表
 
 刻意不做：無 Key 的資源頁直接改設定；不把 Key 寫入 `localStorage`（當次輸入；若管理中心同源已有 Key 可選用，不強制）。
@@ -145,3 +149,4 @@ plugins:
 - 未選帳號 → 不 ping
 - 儲存：宿主 `plugins.configs` + Management API；非僅記憶體
 - 整體做法 A：獨立插件 + 單頁 UI
+- 帳號列顯示 CPA 可見的 5h／週限（有則顯示、無則 —；不捏造）
