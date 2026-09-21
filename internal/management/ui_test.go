@@ -27,3 +27,42 @@ func TestRenderStatusPageChineseAndQuotaDash(t *testing.T) {
 		t.Fatal("must not use localStorage for key")
 	}
 }
+
+func TestRenderStatusPageEnabledCheckbox(t *testing.T) {
+	html := RenderStatusPage(StatusResponse{
+		Enabled: true, Version: "0.1.0", Model: "gpt-5.6-luna",
+		Timezone: "Asia/Taipei", Times: []string{"21:00"},
+	})
+	if !strings.Contains(html, `id="enabled"`) {
+		t.Fatal("missing enabled checkbox control")
+	}
+	if !strings.Contains(html, "啟用") {
+		t.Fatal("missing 繁中 label for enabled")
+	}
+	// Must not hardcode enabled:true on save; read from checkbox instead.
+	if strings.Contains(html, "enabled:true") {
+		t.Fatal("save must not hardcode enabled:true")
+	}
+	if !strings.Contains(html, `getElementById('enabled')`) && !strings.Contains(html, `getElementById("enabled")`) {
+		t.Fatal("save must read enabled from checkbox")
+	}
+	// Find enabled checkbox is checked when Enabled=true
+	idx := strings.Index(html, `id="enabled"`)
+	snippet := html[idx : idx+80]
+	if !strings.Contains(snippet, "checked") {
+		t.Fatalf("enabled checkbox should be checked when st.Enabled=true; snippet=%q", snippet)
+	}
+
+	htmlOff := RenderStatusPage(StatusResponse{
+		Enabled: false, Version: "0.1.0", Model: "gpt-5.6-luna",
+		Timezone: "Asia/Taipei", Times: []string{"21:00"},
+	})
+	idx = strings.Index(htmlOff, `id="enabled"`)
+	if idx < 0 {
+		t.Fatal("missing enabled when disabled")
+	}
+	snippet = htmlOff[idx : idx+80]
+	if strings.Contains(snippet, "checked") {
+		t.Fatalf("enabled checkbox must not be checked when st.Enabled=false; snippet=%q", snippet)
+	}
+}

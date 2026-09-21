@@ -160,9 +160,13 @@ func pingOnce(ctx context.Context, h hostapi.Host, a hostapi.AuthFile) Outcome {
 		return Outcome{Status: "success", HTTPStatus: resp.StatusCode}
 	}
 	typ, msg, reset := parseUpstreamError(resp.Body)
-	if typ == "usage_limit_reached" {
+	if typ == "usage_limit_reached" || resp.StatusCode == 429 {
 		if msg == "" {
-			msg = "usage limit reached"
+			if typ == "usage_limit_reached" {
+				msg = "usage limit reached"
+			} else {
+				msg = "upstream HTTP 429"
+			}
 		}
 		return Outcome{Status: "limited", HTTPStatus: resp.StatusCode, Error: msg, ResetsAt: reset}
 	}
@@ -194,7 +198,7 @@ func parseUpstreamError(body []byte) (string, string, time.Time) {
 
 func isRetryableHTTP(code int) bool {
 	switch code {
-	case 408, 425, 429, 500, 502, 503, 504:
+	case 408, 425, 500, 502, 503, 504:
 		return true
 	default:
 		return false

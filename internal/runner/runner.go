@@ -150,8 +150,7 @@ func enrichAll(ctx context.Context, h hostapi.Host, files []hostapi.AuthFile) []
 		if raw, err := h.AuthGetRuntime(ctx, f.AuthIndex); err == nil {
 			runtime = raw
 		}
-		extra, _ := json.Marshal(f)
-		out[i] = hostapi.EnrichQuota(f, extra, runtime)
+		out[i] = hostapi.EnrichQuota(f, runtime)
 	}
 	return out
 }

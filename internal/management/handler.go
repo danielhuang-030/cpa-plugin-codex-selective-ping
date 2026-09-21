@@ -83,8 +83,7 @@ func (h *Handler) status() StatusResponse {
 		if raw, err := h.Plugin.Host.AuthGetRuntime(ctx, f.AuthIndex); err == nil {
 			runtime = raw
 		}
-		extra, _ := json.Marshal(f)
-		enriched = append(enriched, hostapi.EnrichQuota(f, extra, runtime))
+		enriched = append(enriched, hostapi.EnrichQuota(f, runtime))
 	}
 	snap := h.Plugin.State.Snapshot(cfg.Accounts, enriched, h.Plugin.Sched.Next())
 	return StatusResponse{

@@ -83,3 +83,20 @@ func TestPingRetriesThenFails(t *testing.T) {
 		t.Fatalf("calls=%d", h.calls)
 	}
 }
+
+func TestPingBare429LimitedNoRetry(t *testing.T) {
+	h := &mockHost{token: "tok", status: 429, body: []byte(`{}`)}
+	old := retryDelayFn
+	retryDelayFn = func(int) time.Duration { return time.Millisecond }
+	defer func() { retryDelayFn = old }()
+	out := PingAccount(context.Background(), h, hostapi.AuthFile{AuthIndex: "1"}, true, time.Time{}, time.Time{})
+	if out.Status != "limited" {
+		t.Fatalf("status=%q want limited; %#v", out.Status, out)
+	}
+	if out.Attempts != 1 {
+		t.Fatalf("attempts=%d want 1 (no retry storm)", out.Attempts)
+	}
+	if h.calls != 1 {
+		t.Fatalf("http calls=%d want 1", h.calls)
+	}
+}

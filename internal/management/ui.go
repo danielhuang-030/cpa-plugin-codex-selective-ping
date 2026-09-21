@@ -35,6 +35,10 @@ func RenderStatusPage(st StatusResponse) string {
 	if st.Enabled {
 		enabled = "已啟用"
 	}
+	enabledChecked := ""
+	if st.Enabled {
+		enabledChecked = " checked"
+	}
 	selectedN := 0
 	for _, a := range st.Accounts {
 		if a.Selected {
@@ -134,6 +138,7 @@ pre{white-space:pre-wrap;background:#f6f6f6;padding:12px;border-radius:6px}
 </div></section>
 <section class="card"><h2>排程</h2>
 <div class="row" style="margin-bottom:10px">
+  <label><input id="enabled" type="checkbox"%s/> 啟用</label>
   <label>時區</label><input id="tz" type="text" value="%s"/>
   <label>新增時段</label><input id="new-time" type="time" value="21:00"/>
   <button class="btn secondary" type="button" onclick="addTime()">加入</button>
@@ -197,7 +202,7 @@ function key(){ return document.getElementById('management-key').value.trim(); }
 async function saveCfg(){
   const o=document.getElementById('result'); const k=key();
   if(!k){ o.textContent='需要 Management Key'; return; }
-  const body={enabled:true, timezone:document.getElementById('tz').value.trim(), times:times, accounts:selectedAccounts()};
+  const body={enabled:document.getElementById('enabled').checked, timezone:document.getElementById('tz').value.trim(), times:times, accounts:selectedAccounts()};
   o.textContent='儲存中...';
   try{
     const r=await fetch('/v0/management/plugins/codex-selective-ping/config',{method:'PATCH',headers:{'Authorization':'Bearer '+k,'Content-Type':'application/json'},body:JSON.stringify(body)});
@@ -222,6 +227,7 @@ renderTimes();
 		html.EscapeString(st.Version), html.EscapeString(st.Model),
 		html.EscapeString(st.Timezone), html.EscapeString(strings.Join(st.Times, " / ")),
 		html.EscapeString(next), html.EscapeString(running),
+		enabledChecked,
 		html.EscapeString(st.Timezone),
 		html.EscapeString(banner),
 		rows.String(),

@@ -41,12 +41,20 @@ func (cpaHost) AuthList(ctx context.Context) ([]hostapi.AuthFile, error) {
 		return nil, fmt.Errorf("host.auth.list failed")
 	}
 	var resp struct {
-		Files []hostapi.AuthFile `json:"files"`
+		Files []json.RawMessage `json:"files"`
 	}
 	if err := json.Unmarshal(env.Result, &resp); err != nil {
 		return nil, err
 	}
-	return resp.Files, nil
+	out := make([]hostapi.AuthFile, 0, len(resp.Files))
+	for _, rawItem := range resp.Files {
+		var file hostapi.AuthFile
+		if err := json.Unmarshal(rawItem, &file); err != nil {
+			return nil, err
+		}
+		out = append(out, hostapi.EnrichQuota(file, rawItem))
+	}
+	return out, nil
 }
 
 func (cpaHost) AuthGet(ctx context.Context, authIndex string) ([]byte, error) {
