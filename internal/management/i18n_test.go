@@ -3,9 +3,11 @@ package management
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"cpa-plugin-codex-selective-ping/internal/config"
 	"cpa-plugin-codex-selective-ping/internal/plugin"
+	"cpa-plugin-codex-selective-ping/internal/runstate"
 )
 
 func TestNormalizeLang(t *testing.T) {
@@ -173,4 +175,40 @@ func testPlugin() *plugin.Plugin {
 	p := plugin.New(&mh{files: nil}, "0.1.0")
 	p.ApplyConfig(config.Config{Enabled: true, Timezone: "Asia/Taipei", Times: []string{"21:00"}, Accounts: []string{}})
 	return p
+}
+
+func TestCatalogParity(t *testing.T) {
+	zh := catalogs[LangZhHant]
+	for _, lang := range []Lang{LangEn, LangJa} {
+		m := catalogs[lang]
+		if len(m) != len(zh) {
+			t.Fatalf("%s has %d keys, zh-Hant has %d", lang, len(m), len(zh))
+		}
+		for k := range zh {
+			if _, ok := m[k]; !ok {
+				t.Fatalf("%s missing key %q", lang, k)
+			}
+		}
+	}
+}
+
+func TestLastRunChipsTranslated(t *testing.T) {
+	html := RenderStatusPage(StatusResponse{
+		Enabled: true, Version: "0.1.0", Model: "gpt-5.6-luna",
+		Timezone: "Asia/Taipei", Times: []string{"21:00"},
+		Accounts: []runstate.AccountView{{AuthIndex: "idx-1", Name: "alice", Email: "a@x.com"}},
+		LastRun: &runstate.Summary{
+			At: time.Date(2026, 9, 21, 21, 0, 0, 0, time.UTC),
+			Mode: "manual", Succeeded: 1,
+			Accounts: []runstate.AccountResult{{Name: "alice", Status: "success", HTTPStatus: 200}},
+		},
+	}, LangJa)
+	if strings.Contains(html, "mode:") || strings.Contains(html, "auth_index:") {
+		t.Fatal("ja page must not keep English chip/account labels")
+	}
+	for _, want := range []string{"モード", "認証ID", "成功"} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("ja last-run missing %q", want)
+		}
+	}
 }

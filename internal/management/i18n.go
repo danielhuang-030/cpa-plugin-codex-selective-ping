@@ -73,8 +73,7 @@ func firstAcceptLanguageTag(header string) string {
 	if header == "" {
 		return ""
 	}
-	// Take highest-priority tag (first entry); ignore q-weights for simplicity
-	// but still skip empty pieces.
+	// Take the tag with the highest q-weight (default q=1); skip empty pieces.
 	bestTag := ""
 	bestQ := -1.0
 	for _, part := range strings.Split(header, ",") {
@@ -164,6 +163,16 @@ var catalogs = map[Lang]map[string]string{
 		"quota_remain":       "剩",
 		"quota_used":         "用",
 		"quota_reset":        "重置",
+		"auth_index_label":  "認證索引",
+		"chip_mode":         "模式",
+		"chip_ok":           "成功",
+		"chip_limited":      "限額",
+		"chip_failed":       "失敗",
+		"chip_skipped":      "略過",
+		"status_success":    "成功",
+		"status_limited":    "限額",
+		"status_failed":     "失敗",
+		"status_skipped":    "略過",
 		"lang_zh":            "繁中",
 		"lang_en":            "English",
 		"lang_ja":            "日本語",
@@ -215,6 +224,16 @@ var catalogs = map[Lang]map[string]string{
 		"quota_remain":       "left",
 		"quota_used":         "used",
 		"quota_reset":        "resets",
+		"auth_index_label":  "auth_index",
+		"chip_mode":         "mode",
+		"chip_ok":           "ok",
+		"chip_limited":      "limited",
+		"chip_failed":       "failed",
+		"chip_skipped":      "skipped",
+		"status_success":    "success",
+		"status_limited":    "limited",
+		"status_failed":     "failed",
+		"status_skipped":    "skipped",
 		"lang_zh":            "繁中",
 		"lang_en":            "English",
 		"lang_ja":            "日本語",
@@ -266,6 +285,16 @@ var catalogs = map[Lang]map[string]string{
 		"quota_remain":       "残",
 		"quota_used":         "使用",
 		"quota_reset":        "リセット",
+		"auth_index_label":  "認証ID",
+		"chip_mode":         "モード",
+		"chip_ok":           "成功",
+		"chip_limited":      "制限",
+		"chip_failed":       "失敗",
+		"chip_skipped":      "スキップ",
+		"status_success":    "成功",
+		"status_limited":    "制限",
+		"status_failed":     "失敗",
+		"status_skipped":    "スキップ",
 		"lang_zh":            "繁中",
 		"lang_en":            "English",
 		"lang_ja":            "日本語",

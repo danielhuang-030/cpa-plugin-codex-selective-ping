@@ -5,7 +5,7 @@ Brand-new independent CLIProxyAPI plugin. Like `codex-auto-ping`, but only pings
 - Plugin ID: `codex-selective-ping`
 - Fixed model: `gpt-5.6-luna`
 - Config persistence: host `plugins.configs.codex-selective-ping`
-- Management UI: Traditional Chinese resource page
+- Management UI: Traditional Chinese / English / Japanese (default follows CPA Management Center language)
 
 ## CPA configuration
 
@@ -54,7 +54,9 @@ Save settings from the UI via host:
 GET/PATCH /v0/management/plugins/codex-selective-ping/config
 ```
 
-`POST .../run` returns 202, or 409 if a run is already in progress.
+`POST .../run` returns 202, or 409 if a run is already in progress. Manual Run now still works when scheduled ping is disabled (`enabled: false`); only the daily schedule is stopped.
+
+The resource page language follows CPA Management Center (`cli-proxy-language` / `Accept-Language`); override with `?lang=zh-Hant|en|ja`. Unsupported locales fall back to Traditional Chinese. The plugin never writes CPA's language key.
 
 Quota columns (Plan / 5h / weekly) show host-provided values only; missing fields render as "—".
 

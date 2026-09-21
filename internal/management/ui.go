@@ -58,14 +58,14 @@ func RenderStatusPage(st StatusResponse, lang Lang) string {
 		}
 		fmt.Fprintf(&rows, `<tr>
 <td><input type="checkbox" class="acct" data-id="%s"%s></td>
-<td>%s<br><small>%s · auth_index: %s</small></td>
+<td>%s<br><small>%s · %s: %s</small></td>
 <td>%s</td>
 <td class="quota">%s</td>
 <td class="quota">%s</td>
 <td>%s</td>
 </tr>`,
 			html.EscapeString(preferID(a)), checked,
-			html.EscapeString(a.Name), html.EscapeString(a.Email), html.EscapeString(a.AuthIndex),
+			html.EscapeString(a.Name), html.EscapeString(a.Email), html.EscapeString(t("auth_index_label")), html.EscapeString(a.AuthIndex),
 			dash(a.Plan),
 			formatWindow(a.FiveHour, lang),
 			formatWindow(a.Weekly, lang),
@@ -78,19 +78,22 @@ func RenderStatusPage(st StatusResponse, lang Lang) string {
 		var lrRows strings.Builder
 		for _, a := range lr.Accounts {
 			fmt.Fprintf(&lrRows, `<tr><td>%s</td><td>%s</td><td>%d</td><td>%s</td></tr>`,
-				html.EscapeString(a.Name), html.EscapeString(a.Status), a.HTTPStatus, html.EscapeString(orDash(a.Error)))
+				html.EscapeString(a.Name), html.EscapeString(statusLabel(lang, a.Status)), a.HTTPStatus, html.EscapeString(orDash(a.Error)))
 		}
 		lastBlock = fmt.Sprintf(`<div class="row" style="margin-bottom:8px">
-<span class="tag">mode: %s</span>
+<span class="tag">%s: %s</span>
 <span class="tag">%s</span>
-<span class="tag">ok %d</span>
-<span class="tag">limited %d</span>
-<span class="tag">failed %d</span>
-<span class="tag">skipped %d</span>
+<span class="tag">%s %d</span>
+<span class="tag">%s %d</span>
+<span class="tag">%s %d</span>
+<span class="tag">%s %d</span>
 </div>
 <table><thead><tr><th data-i18n="col_account">%s</th><th data-i18n="col_result">%s</th><th data-i18n="col_http">%s</th><th data-i18n="col_detail">%s</th></tr></thead><tbody>%s</tbody></table>`,
-			html.EscapeString(lr.Mode), html.EscapeString(lr.At.Format(time.RFC3339)),
-			lr.Succeeded, lr.Limited, lr.Failed, lr.Skipped,
+			html.EscapeString(t("chip_mode")), html.EscapeString(lr.Mode), html.EscapeString(lr.At.Format(time.RFC3339)),
+			html.EscapeString(t("chip_ok")), lr.Succeeded,
+			html.EscapeString(t("chip_limited")), lr.Limited,
+			html.EscapeString(t("chip_failed")), lr.Failed,
+			html.EscapeString(t("chip_skipped")), lr.Skipped,
 			html.EscapeString(t("col_account")), html.EscapeString(t("col_result")),
 			html.EscapeString(t("col_http")), html.EscapeString(t("col_detail")),
 			lrRows.String())
@@ -236,6 +239,15 @@ function normalizeCPALang(raw){
   }catch(e){}
 })();
 
+
+document.querySelectorAll('.lang-switch a[data-lang]').forEach(function(a){
+  a.addEventListener('click', function(e){
+    e.preventDefault();
+    var u=new URL(location.href);
+    u.searchParams.set('lang', a.getAttribute('data-lang'));
+    location.assign(u.toString());
+  });
+});
 function renderTimes(){
   const el = document.getElementById('times');
   el.innerHTML = '';
@@ -341,6 +353,22 @@ func langActive(current, target Lang) string {
 	}
 	return ""
 }
+
+func statusLabel(lang Lang, status string) string {
+	switch strings.ToLower(strings.TrimSpace(status)) {
+	case "success":
+		return T(lang, "status_success")
+	case "limited":
+		return T(lang, "status_limited")
+	case "failed":
+		return T(lang, "status_failed")
+	case "skipped":
+		return T(lang, "status_skipped")
+	default:
+		return status
+	}
+}
+
 
 func preferID(a runstate.AccountView) string {
 	if a.AuthIndex != "" {
