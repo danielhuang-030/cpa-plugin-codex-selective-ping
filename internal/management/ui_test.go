@@ -18,7 +18,7 @@ func TestRenderStatusPageChineseAndQuotaDash(t *testing.T) {
 			{AuthIndex: "2", Name: "bob", Selected: false, Status: "unknown"},
 		},
 	}, LangZhHant)
-	for _, want := range []string{"概況", "排程", "帳號", "立刻執行", "儲存設定", "Management Key", "Plan", "5h", "週限", "—", "plugins/codex-selective-ping/config", "plugins/codex-selective-ping/run"} {
+	for _, want := range []string{"今天的節奏", "要打誰", "操作原則", "立刻執行", "儲存設定", "Management Key", "Plan", "5h", "週限", "—", "plugins/codex-selective-ping/config", "plugins/codex-selective-ping/run", "排程"} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("missing %q", want)
 		}
@@ -228,5 +228,23 @@ func TestRenderStatusPageAccountsEmptyState(t *testing.T) {
 	}, LangZhHant)
 	if !strings.Contains(html, `id="sec-accounts-empty"`) && !strings.Contains(html, `data-i18n="accounts_empty_title"`) {
 		t.Fatal("missing empty whitelist empty-state")
+	}
+}
+
+func TestRenderStatusPageRailActionsOrder(t *testing.T) {
+	html := RenderStatusPage(StatusResponse{}, LangZhHant)
+	key := strings.Index(html, `id="management-key"`)
+	save := strings.Index(html, `onclick="saveCfg()"`)
+	run := strings.Index(html, `onclick="runNow()"`)
+	if key < 0 || save < 0 || run < 0 {
+		t.Fatal("missing key/save/run controls")
+	}
+	if !(key < save && save < run) {
+		t.Fatalf("expected key then save then run order; key=%d save=%d run=%d", key, save, run)
+	}
+	rail := strings.Index(html, `class="rail"`)
+	ws := strings.Index(html, `class="workspace"`)
+	if rail < 0 || ws < 0 || !(rail < key && key < ws && save < ws && run < ws) {
+		t.Fatal("actions should live in rail")
 	}
 }

@@ -77,7 +77,7 @@ func TestRenderStatusPageEnglish(t *testing.T) {
 		Timezone: "Asia/Taipei", Times: []string{"21:00"},
 	}, LangEn)
 	for _, want := range []string{
-		`lang="en"`, "Overview", "Schedule", "Accounts", "Actions",
+		`lang="en"`, "Today&#39;s rhythm", "Who to ping", "Operating principles",
 		"Save settings", "Run now", "Enable", "Timezone",
 		"English", "繁中", "日本語",
 	} {
@@ -85,8 +85,8 @@ func TestRenderStatusPageEnglish(t *testing.T) {
 			t.Fatalf("en page missing %q", want)
 		}
 	}
-	if strings.Contains(html, "概況") {
-		t.Fatal("en page should not show 繁中 section title 概況")
+	if strings.Contains(html, "今天的節奏") {
+		t.Fatal("en page should not show 繁中 rhythm title")
 	}
 }
 
@@ -96,7 +96,7 @@ func TestRenderStatusPageJapanese(t *testing.T) {
 		Timezone: "Asia/Taipei", Times: []string{"21:00"},
 	}, LangJa)
 	for _, want := range []string{
-		`lang="ja"`, "概要", "スケジュール", "アカウント", "操作",
+		`lang="ja"`, "今日のリズム", "対象アカウント", "操作の原則",
 		"設定を保存", "今すぐ実行", "有効", "タイムゾーン",
 	} {
 		if !strings.Contains(html, want) {

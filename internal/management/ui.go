@@ -77,10 +77,6 @@ func RenderStatusPage(st StatusResponse, lang Lang) string {
 			}
 		}
 	}
-	running := t("no")
-	if st.Running {
-		running = t("yes")
-	}
 	enabled := t("enabled_off")
 	if st.Enabled {
 		enabled = t("enabled_on")
@@ -90,6 +86,10 @@ func RenderStatusPage(st StatusResponse, lang Lang) string {
 		enabledChecked = " checked"
 	}
 	nextSlot := nextSlotLabel(st.NextRun, st.Times, st.Timezone)
+	railNext := next
+	if nextSlot != "" {
+		railNext = nextSlot
+	}
 	var timeline strings.Builder
 	for _, tm := range st.Times {
 		slotClass := "slot"
@@ -224,15 +224,30 @@ pre{white-space:pre-wrap;background:var(--pre);padding:12px;border-radius:6px}
     <a href="?lang=en" class="%s" data-lang="en">%s</a>
     <a href="?lang=ja" class="%s" data-lang="ja">%s</a>
   </nav>
+  <div class="status-pill"><i></i> %s · v%s</div>
+  <div class="rail-block">
+    <h3 data-i18n="rail_now">%s</h3>
+    <div class="metric"><span class="k" data-i18n="next_run">%s</span><span class="v">%s</span></div>
+    <div class="metric"><span class="k" data-i18n="rail_whitelist">%s</span><span class="v">%d / %d</span></div>
+    <div class="metric"><span class="k" data-i18n="rail_model">%s</span><span class="v">%s</span></div>
+    <div class="metric"><span class="k" data-i18n="timezone">%s</span><span class="v">%s</span></div>
+  </div>
+  <div class="rail-block">
+    <h3 data-i18n="rail_key">%s</h3>
+    <label class="field">Management Key
+      <input id="management-key" type="password" autocomplete="off" data-i18n-placeholder="key_placeholder" placeholder="%s"/>
+    </label>
+    <div class="primary-stack">
+      <button class="btn-primary" type="button" onclick="saveCfg()" data-i18n="save">%s</button>
+      <button class="btn-secondary" type="button" onclick="runNow()" data-i18n="run_now">%s</button>
+      <button class="btn-ghost" type="button" onclick="location.reload()" data-i18n="refresh">%s</button>
+    </div>
+    <p class="hint" data-i18n="actions_hint">%s</p>
+    <pre id="result"></pre>
+  </div>
 </aside>
 <div class="workspace">
-<section class="card"><h2 data-i18n="overview">%s</h2>
-<div class="grid">
-  <div class="stat"><div class="k" data-i18n="status">%s</div><div class="v">%s</div></div>
-  <div class="stat"><div class="k" data-i18n="version_model">%s</div><div class="v">%s · %s</div></div>
-  <div class="stat"><div class="k" data-i18n="tz_times">%s</div><div class="v">%s · %s</div></div>
-  <div class="stat"><div class="k" data-i18n="next_run">%s</div><div class="v">%s · <span data-i18n="running_label">%s</span>：%s</div></div>
-</div></section>
+<section class="hero">
 <section class="panel" id="sec-rhythm">
 <h2 data-i18n="rhythm_title">%s</h2>
 <p class="sub" data-i18n="schedule_hint">%s</p>
@@ -245,6 +260,14 @@ pre{white-space:pre-wrap;background:var(--pre);padding:12px;border-radius:6px}
     <input id="schedule_enabled" type="checkbox"%s/> <span data-i18n="enable">%s</span>
   </label>
 </div>
+</section>
+<section class="panel" id="sec-principles" style="background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 16%%, var(--panel)), var(--panel));">
+<h2 data-i18n="principles_title">%s</h2>
+<p class="sub" data-i18n="principles_body">%s</p>
+<div class="metric"><span class="k" data-i18n="status">%s</span><span class="v"><span class="chip ok">%s</span></span></div>
+<div class="metric"><span class="k" data-i18n="col_5h">%s</span><span class="v" data-i18n="principles_quota">%s</span></div>
+<div class="metric"><span class="k" data-i18n="last_run">%s</span><span class="v" data-i18n="principles_persist">%s</span></div>
+</section>
 </section>
 <section class="panel" id="sec-accounts-filled">
 <div class="accounts-head">
@@ -272,16 +295,6 @@ pre{white-space:pre-wrap;background:var(--pre);padding:12px;border-radius:6px}
     <p data-i18n="accounts_empty_body">%s</p>
     <button class="btn-primary" type="button" onclick="document.getElementById('sec-accounts-filled')?.scrollIntoView({behavior:'smooth'})" data-i18n="accounts_empty_cta">%s</button>
   </div>
-</section>
-<section class="card"><h2 data-i18n="actions">%s</h2>
-<div class="row">
-  <input id="management-key" type="password" autocomplete="off" data-i18n-placeholder="key_placeholder" placeholder="%s"/>
-  <button class="btn" type="button" onclick="saveCfg()" data-i18n="save">%s</button>
-  <button class="btn secondary" type="button" onclick="runNow()" data-i18n="run_now">%s</button>
-  <button class="btn secondary" type="button" onclick="location.reload()" data-i18n="refresh">%s</button>
-</div>
-<p class="hint" data-i18n="actions_hint">%s</p>
-<pre id="result"></pre>
 </section>
 <section class="card"><h2 data-i18n="last_run">%s</h2>%s</section>
 </div>
@@ -650,14 +663,18 @@ renderTimes();
 		langActive(lang, LangZhHant), html.EscapeString(t("lang_zh")),
 		langActive(lang, LangEn), html.EscapeString(t("lang_en")),
 		langActive(lang, LangJa), html.EscapeString(t("lang_ja")),
-		html.EscapeString(t("overview")),
-		html.EscapeString(t("status")), html.EscapeString(enabled),
-		html.EscapeString(t("version_model")),
-		html.EscapeString(st.Version), html.EscapeString(st.Model),
-		html.EscapeString(t("tz_times")),
-		html.EscapeString(st.Timezone), html.EscapeString(strings.Join(st.Times, " / ")),
-		html.EscapeString(t("next_run")),
-		html.EscapeString(next), html.EscapeString(t("running_label")), html.EscapeString(running),
+		html.EscapeString(enabled), html.EscapeString(st.Version),
+		html.EscapeString(t("rail_now")),
+		html.EscapeString(t("next_run")), html.EscapeString(railNext),
+		html.EscapeString(t("rail_whitelist")), selectedN, len(st.Accounts),
+		html.EscapeString(t("rail_model")), html.EscapeString(st.Model),
+		html.EscapeString(t("timezone")), html.EscapeString(st.Timezone),
+		html.EscapeString(t("rail_key")),
+		html.EscapeString(t("key_placeholder")),
+		html.EscapeString(t("save")),
+		html.EscapeString(t("run_now")),
+		html.EscapeString(t("refresh")),
+		html.EscapeString(t("actions_hint")),
 		html.EscapeString(t("rhythm_title")),
 		html.EscapeString(t("schedule_hint")),
 		timeline.String(),
@@ -667,6 +684,11 @@ renderTimes();
 		html.EscapeString(t("add")),
 		enabledChecked,
 		html.EscapeString(t("enable")),
+		html.EscapeString(t("principles_title")),
+		html.EscapeString(t("principles_body")),
+		html.EscapeString(t("status")), html.EscapeString(enabled),
+		html.EscapeString(t("col_5h")), html.EscapeString(t("principles_quota")),
+		html.EscapeString(t("last_run")), html.EscapeString(t("principles_persist")),
 		html.EscapeString(t("accounts_who_title")),
 		html.EscapeString(t("accounts_hint")),
 		html.EscapeString(fmt.Sprintf(t("filter_all"), len(st.Accounts))),
@@ -681,12 +703,6 @@ renderTimes();
 		html.EscapeString(t("accounts_empty_title")),
 		html.EscapeString(t("accounts_empty_body")),
 		html.EscapeString(t("accounts_empty_cta")),
-		html.EscapeString(t("actions")),
-		html.EscapeString(t("key_placeholder")),
-		html.EscapeString(t("save")),
-		html.EscapeString(t("run_now")),
-		html.EscapeString(t("refresh")),
-		html.EscapeString(t("actions_hint")),
 		html.EscapeString(t("last_run")),
 		lastBlock,
 		string(timesJSON),
