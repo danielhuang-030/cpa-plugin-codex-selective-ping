@@ -1,3 +1,4 @@
+# Nested auto-ping reference must never ship from this product tree
 cpa-plugin-codex-auto-ping/
 *.so
 *.dylib
