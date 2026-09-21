@@ -15,16 +15,18 @@ type Config struct {
 	Timezone  string   `json:"timezone"`
 	Times     []string `json:"times"`
 	Accounts  []string `json:"accounts"`
-	DataDir   string   `json:"data_dir,omitempty"`
-	StatePath string   `json:"state_path,omitempty"`
+	DataDir      string `json:"data_dir,omitempty"`
+	StatePath    string `json:"state_path,omitempty"`
+	HistoryLimit int    `json:"history_limit,omitempty"`
 }
 
 func DefaultConfig() Config {
 	return Config{
-		Enabled:  true,
-		Timezone: "Asia/Taipei",
-		Times:    append([]string(nil), defaultTimes...),
-		Accounts: []string{},
+		Enabled:      true,
+		Timezone:     "Asia/Taipei",
+		Times:        append([]string(nil), defaultTimes...),
+		Accounts:     []string{},
+		HistoryLimit: 60,
 	}
 }
 
@@ -40,8 +42,9 @@ func Parse(raw string) (Config, error) {
 			Timezone        string   `json:"timezone"`
 			Times           []string `json:"times"`
 			Accounts        []string `json:"accounts"`
-			DataDir         string   `json:"data_dir"`
-			StatePath       string   `json:"state_path"`
+			DataDir         string `json:"data_dir"`
+			StatePath       string `json:"state_path"`
+			HistoryLimit    *int   `json:"history_limit"`
 		}
 		if err := json.Unmarshal([]byte(text), &p); err != nil {
 			return Config{}, fmt.Errorf("invalid JSON config: %w", err)
@@ -64,6 +67,9 @@ func Parse(raw string) (Config, error) {
 		}
 		if strings.TrimSpace(p.StatePath) != "" {
 			cfg.StatePath = strings.TrimSpace(p.StatePath)
+		}
+		if p.HistoryLimit != nil {
+			cfg.HistoryLimit = *p.HistoryLimit
 		}
 		return Validate(cfg)
 	}
@@ -131,6 +137,14 @@ func parseYAMLSubset(text string, cfg Config) (Config, error) {
 			if value != "" {
 				cfg.StatePath = unquote(value)
 			}
+		case "history_limit":
+			if value != "" {
+				n, err := strconv.Atoi(unquote(value))
+				if err != nil {
+					return Config{}, fmt.Errorf("history_limit must be an integer")
+				}
+				cfg.HistoryLimit = n
+			}
 		}
 	}
 	if times != nil {
@@ -178,6 +192,9 @@ func Validate(cfg Config) (Config, error) {
 	cfg.Accounts = outAcc
 	cfg.DataDir = strings.TrimSpace(cfg.DataDir)
 	cfg.StatePath = strings.TrimSpace(cfg.StatePath)
+	if cfg.HistoryLimit <= 0 {
+		cfg.HistoryLimit = 60
+	}
 	return cfg, nil
 }
 

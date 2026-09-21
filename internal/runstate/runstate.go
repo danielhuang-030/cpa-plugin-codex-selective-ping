@@ -57,10 +57,11 @@ type AccountView struct {
 }
 
 type StatusSnapshot struct {
-	Running  bool          `json:"running"`
-	NextRun  *time.Time    `json:"next_run,omitempty"`
-	LastRun  *Summary      `json:"last_run,omitempty"`
-	Accounts []AccountView `json:"accounts,omitempty"`
+	Running     bool          `json:"running"`
+	NextRun     *time.Time    `json:"next_run,omitempty"`
+	LastRun     *Summary      `json:"last_run,omitempty"`
+	RunHistory  []Summary     `json:"run_history,omitempty"`
+	Accounts    []AccountView `json:"accounts,omitempty"`
 }
 
 type accountMem struct {
@@ -74,16 +75,18 @@ type accountMem struct {
 }
 
 type State struct {
-	mu          sync.RWMutex
-	running     bool
-	nextRun     time.Time
-	lastRun     *Summary
-	byIndex     map[string]accountMem
-	persistPath string
+	mu           sync.RWMutex
+	running      bool
+	nextRun      time.Time
+	lastRun      *Summary
+	history      []Summary
+	historyLimit int
+	byIndex      map[string]accountMem
+	persistPath  string
 }
 
 func New() *State {
-	return &State{byIndex: map[string]accountMem{}}
+	return &State{byIndex: map[string]accountMem{}, historyLimit: 60}
 }
 
 func (s *State) TryBegin() bool {
@@ -123,9 +126,16 @@ func (s *State) End(summary Summary) {
 		}
 		s.byIndex[a.AuthIndex] = m
 	}
-	toSave := cp
+	s.history = append([]Summary{cp}, s.history...)
+	limit := s.historyLimit
+	if limit <= 0 {
+		limit = 60
+	}
+	if len(s.history) > limit {
+		s.history = s.history[:limit]
+	}
 	s.mu.Unlock()
-	s.persistLastRun(toSave)
+	s.persistHistory()
 }
 
 func (s *State) SetNextRun(t time.Time) {
@@ -168,6 +178,7 @@ func (s *State) Snapshot(cfgAccounts []string, discovered []hostapi.AuthFile, ne
 		cp.Accounts = append([]AccountResult(nil), s.lastRun.Accounts...)
 		last = &cp
 	}
+	hist := cloneRuns(s.history)
 	selected := selector.Select(discovered, cfgAccounts)
 	sel := map[string]bool{}
 	for _, a := range selected {
@@ -201,7 +212,7 @@ func (s *State) Snapshot(cfgAccounts []string, discovered []hostapi.AuthFile, ne
 	sort.Slice(views, func(i, j int) bool {
 		return strings.ToLower(views[i].Name) < strings.ToLower(views[j].Name)
 	})
-	return StatusSnapshot{Running: s.running, NextRun: next, LastRun: last, Accounts: views}
+	return StatusSnapshot{Running: s.running, NextRun: next, LastRun: last, RunHistory: hist, Accounts: views}
 }
 
 func safeName(a hostapi.AuthFile) string {

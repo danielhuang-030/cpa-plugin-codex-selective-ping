@@ -56,6 +56,31 @@ func loadLoc(timezone string) *time.Location {
 	return time.Local
 }
 
+
+func renderRunHistoryList(st StatusResponse, t func(string) string) string {
+	runs := st.RunHistory
+	if len(runs) == 0 && st.LastRun != nil {
+		runs = []runstate.Summary{*st.LastRun}
+	}
+	if len(runs) == 0 {
+		return ""
+	}
+	var b strings.Builder
+	b.WriteString(`<div class="run-history" data-testid="run-history">`)
+	b.WriteString(`<h3 data-i18n="run_history">` + html.EscapeString(t("run_history")) + `</h3>`)
+	b.WriteString(`<p class="sub" data-i18n="run_history_sub">` + html.EscapeString(t("run_history_sub")) + `</p>`)
+	b.WriteString(`<div class="run-history-list">`)
+	for _, r := range runs {
+		meta := fmt.Sprintf("%s · %s · ok %d · fail %d · skip %d",
+			html.EscapeString(r.Mode),
+			html.EscapeString(r.At.Format("2006-01-02 15:04")),
+			r.Succeeded, r.Failed, r.Skipped)
+		fmt.Fprintf(&b, `<div class="run-history-item"><div class="meta">%s</div></div>`, meta)
+	}
+	b.WriteString(`</div></div>`)
+	return b.String()
+}
+
 func RenderStatusPage(st StatusResponse, lang Lang) string {
 	if lang == "" {
 		lang = LangZhHant
@@ -179,6 +204,9 @@ func RenderStatusPage(st StatusResponse, lang Lang) string {
 		if lr.Message != "" {
 			lastBlock += `<p class="hint">` + html.EscapeString(lr.Message) + `</p>`
 		}
+	}
+	if hist := renderRunHistoryList(st, t); hist != "" && lastBlock != "" {
+		lastBlock += hist
 	}
 	timesJSON, _ := json.Marshal(st.Times)
 	banner := fmt.Sprintf(t("banner_selected"), selectedN, len(st.Accounts))

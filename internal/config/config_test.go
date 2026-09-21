@@ -154,3 +154,61 @@ func TestParseJSONDataDirAndStatePath(t *testing.T) {
 		t.Fatalf("%#v", cfg)
 	}
 }
+
+func TestDefaultConfigHistoryLimit(t *testing.T) {
+	cfg := DefaultConfig()
+	if cfg.HistoryLimit != 60 {
+		t.Fatalf("HistoryLimit default=%d want 60", cfg.HistoryLimit)
+	}
+}
+
+func TestParseJSONHistoryLimit(t *testing.T) {
+	cfg, err := Parse(`{"schedule_enabled":true,"timezone":"UTC","times":["06:00"],"history_limit":10}`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.HistoryLimit != 10 {
+		t.Fatalf("HistoryLimit=%d want 10", cfg.HistoryLimit)
+	}
+}
+
+func TestParseYAMLHistoryLimit(t *testing.T) {
+	raw := `
+schedule_enabled: true
+timezone: UTC
+times: ["06:00"]
+history_limit: 25
+`
+	cfg, err := Parse(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.HistoryLimit != 25 {
+		t.Fatalf("HistoryLimit=%d want 25", cfg.HistoryLimit)
+	}
+}
+
+func TestParseHistoryLimitNonPositiveDefaultsTo60(t *testing.T) {
+	for _, raw := range []string{
+		`{"schedule_enabled":true,"timezone":"UTC","times":["06:00"],"history_limit":0}`,
+		`{"schedule_enabled":true,"timezone":"UTC","times":["06:00"],"history_limit":-3}`,
+	} {
+		cfg, err := Parse(raw)
+		if err != nil {
+			t.Fatalf("%s: %v", raw, err)
+		}
+		if cfg.HistoryLimit != 60 {
+			t.Fatalf("%s: HistoryLimit=%d want 60", raw, cfg.HistoryLimit)
+		}
+	}
+}
+
+func TestParseOmitsHistoryLimitDefaultsTo60(t *testing.T) {
+	cfg, err := Parse(`{"schedule_enabled":true,"timezone":"UTC","times":["06:00"]}`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.HistoryLimit != 60 {
+		t.Fatalf("HistoryLimit=%d want 60", cfg.HistoryLimit)
+	}
+}

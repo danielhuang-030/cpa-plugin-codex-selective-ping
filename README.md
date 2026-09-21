@@ -13,7 +13,7 @@ A [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) (CPA) plugin that 
 - **Fixed model** — `gpt-5.6-luna` (not configurable)
 - **Daily schedule** — IANA timezone + `HH:MM` times; does not ping on CPA startup
 - **Management UI** — Traditional Chinese / English / Japanese (follows CPA Management Center; override with `?lang=` / `?theme=`)
-- **Persisted last run** — `{CPA root}/data/codex-selective-ping/last_run.json` (never under `auth-dir` / `auths/`)
+- **Persisted last run** — `{CPA root}/data/codex-selective-ping/run_history.json` (never under `auth-dir` / `auths/`)
 - **Plugin ID** — `codex-selective-ping` · config key `plugins.configs.codex-selective-ping`
 
 ## Requirements
@@ -74,6 +74,7 @@ plugins:
         - "11:00"
         - "16:00"
         - "21:00"
+      history_limit: 60
       accounts:
         - "user@example.com"
         - "auth_index_or_name"
@@ -108,10 +109,13 @@ Then apply the `plugins.configs.codex-selective-ping` block above and restart CP
 | `timezone` | string | IANA timezone (e.g. `Asia/Taipei`) |
 | `times` | string[] | One or more `HH:MM` values |
 | `accounts` | string[] | Allowlist: `auth_index` (exact) or email / name / account (case-insensitive). Empty → 0 pings |
-| `data_dir` | string | Optional. Directory for `last_run.json` (relative → CPA cwd) |
+| `data_dir` | string | Optional. Directory for `run_history.json` (relative → CPA cwd) |
+| `history_limit` | int | Max stored runs (default **60**; ≤0 treated as 60) |
 | `state_path` | string | Optional. Full path to the last-run file (wins over `data_dir`) |
 
-Default last-run path: `{CPA root}/data/codex-selective-ping/last_run.json` (parent of `plugins/`).
+Run history is stored newest-first in `run_history.json` (default under `{CPA root}/data/codex-selective-ping/`). A legacy single-object `last_run.json` in the same directory is migrated once and then deleted.
+
+Default history path: `{CPA root}/data/codex-selective-ping/run_history.json` (parent of `plugins/`).
 
 ## Management
 

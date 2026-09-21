@@ -2,6 +2,7 @@ package management
 
 import (
 	"strings"
+	"time"
 	"testing"
 
 	"cpa-plugin-codex-selective-ping/internal/hostapi"
@@ -504,5 +505,27 @@ func TestRenderStatusPageUpcomingSlotNotPastCaption(t *testing.T) {
 	}
 	if !strings.Contains(html, "tm < now") {
 		t.Fatal("JS must compare slot time to now for past detection")
+	}
+}
+
+
+func TestRenderStatusPageRunHistoryList(t *testing.T) {
+	htmlOut := RenderStatusPage(StatusResponse{
+		LastRun: &runstate.Summary{
+			At: time.Date(2026, 9, 22, 11, 0, 0, 0, time.UTC), Mode: "manual", Succeeded: 2, Failed: 0, Skipped: 1,
+		},
+		RunHistory: []runstate.Summary{
+			{At: time.Date(2026, 9, 22, 11, 0, 0, 0, time.UTC), Mode: "manual", Succeeded: 2, Skipped: 1, Message: "newer"},
+			{At: time.Date(2026, 9, 22, 10, 0, 0, 0, time.UTC), Mode: "schedule", Succeeded: 1, Failed: 1, Message: "older"},
+		},
+	}, LangEn)
+	if !strings.Contains(htmlOut, `data-testid="run-history"`) {
+		t.Fatal("missing run-history list")
+	}
+	if !strings.Contains(htmlOut, `data-i18n="run_history"`) {
+		t.Fatal("missing run_history i18n")
+	}
+	if !strings.Contains(htmlOut, "manual") || !strings.Contains(htmlOut, "schedule") {
+		t.Fatal("expected both history modes in list")
 	}
 }

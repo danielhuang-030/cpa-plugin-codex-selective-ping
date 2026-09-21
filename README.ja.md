@@ -13,7 +13,7 @@
 - **固定モデル** — `gpt-5.6-luna`（変更不可）
 - **日次スケジュール** — IANA タイムゾーン + `HH:MM`。CPA 起動時には ping しない
 - **管理 UI** — 繁体字中国語 / 英語 / 日本語（CPA 管理センターに追従。`?lang=` / `?theme=` で上書き可）
-- **直近実行の永続化** — `{CPA ルート}/data/codex-selective-ping/last_run.json`（`auth-dir` / `auths/` には書かない）
+- **直近実行の永続化** — `{CPA ルート}/data/codex-selective-ping/run_history.json`（`auth-dir` / `auths/` には書かない）
 - **プラグイン ID** — `codex-selective-ping` · 設定キー `plugins.configs.codex-selective-ping`
 
 ## 要件
@@ -74,6 +74,7 @@ plugins:
         - "11:00"
         - "16:00"
         - "21:00"
+      history_limit: 60
       accounts:
         - "user@example.com"
         - "auth_index_or_name"
@@ -108,10 +109,13 @@ cp package/codex-selective-ping.so /path/to/cpa/plugins/
 | `timezone` | string | IANA タイムゾーン（例: `Asia/Taipei`） |
 | `times` | string[] | 1 つ以上の `HH:MM` |
 | `accounts` | string[] | 許可リスト。`auth_index`（完全一致）または email / name / account（大文字小文字無視）。空 → ping 0 回 |
-| `data_dir` | string | 任意。`last_run.json` のディレクトリ（相対パスは CPA cwd 基準） |
+| `data_dir` | string | 任意。`run_history.json` のディレクトリ（相対パスは CPA cwd 基準） |
+| `history_limit` | int | 保持する実行履歴の上限（既定 **60**；≤0 は 60） |
 | `state_path` | string | 任意。直近実行ファイルのフルパス（`data_dir` より優先） |
 
-既定の直近実行パス: `{CPA ルート}/data/codex-selective-ping/last_run.json`（`plugins/` の親）。
+既定の直近実行パス: `{CPA ルート}/data/codex-selective-ping/run_history.json`（`plugins/` の親）。
+
+実行履歴は新しい順で `run_history.json` に保存します（既定は `{CPA ルート}/data/codex-selective-ping/`）。同じディレクトリに旧形式の単一オブジェクト `last_run.json` だけがある場合は一度移行し、旧ファイルを削除します。
 
 ## 管理
 

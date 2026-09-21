@@ -17,8 +17,9 @@ func configFields(cfg config.Config) []map[string]any {
 		{"Name": "timezone", "Type": "string", "Description": "IANA timezone", "DefaultValue": cfg.Timezone},
 		{"Name": "times", "Type": "string", "Description": "Daily HH:MM times", "DefaultValue": strings.Join(cfg.Times, ",")},
 		{"Name": "accounts", "Type": "string", "Description": "Whitelist of email/auth_index/name; empty=ping nobody", "DefaultValue": ""},
-		{"Name": "data_dir", "Type": "string", "Description": "Optional directory for last_run.json (default: {CPA root}/data/codex-selective-ping)", "DefaultValue": ""},
-		{"Name": "state_path", "Type": "string", "Description": "Optional full path to last_run.json (overrides data_dir)", "DefaultValue": ""},
+		{"Name": "data_dir", "Type": "string", "Description": "Optional directory for run_history.json (default: {CPA root}/data/codex-selective-ping)", "DefaultValue": ""},
+		{"Name": "state_path", "Type": "string", "Description": "Optional full path to run_history.json (overrides data_dir)", "DefaultValue": ""},
+		{"Name": "history_limit", "Type": "int", "Description": "Max persisted run history entries (default 60)", "DefaultValue": cfg.HistoryLimit},
 	}
 }
 

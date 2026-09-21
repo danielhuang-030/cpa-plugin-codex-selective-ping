@@ -40,6 +40,7 @@ type StatusResponse struct {
 	NextRun          interface{}            `json:"next_run,omitempty"`
 	Running          bool                   `json:"running"`
 	LastRun          *runstate.Summary      `json:"last_run,omitempty"`
+	RunHistory       []runstate.Summary     `json:"run_history,omitempty"`
 	Accounts         []runstate.AccountView `json:"accounts,omitempty"`
 }
 
@@ -88,7 +89,7 @@ func (h *Handler) status() StatusResponse {
 		Timezone: cfg.Timezone, Times: cfg.Times, AccountsConfig: cfg.Accounts,
 		WindowSeconds: int64(pinger.WindowInterval.Seconds()), GuardSeconds: int64(pinger.WindowGuard.Seconds()),
 		MaxAttempts: pinger.MaxAttempts, RetryBaseSeconds: int64(pinger.RetryBaseDelay.Seconds()),
-		NextRun: snap.NextRun, Running: snap.Running, LastRun: snap.LastRun, Accounts: snap.Accounts,
+		NextRun: snap.NextRun, Running: snap.Running, LastRun: snap.LastRun, RunHistory: snap.RunHistory, Accounts: snap.Accounts,
 	}
 }
 

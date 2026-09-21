@@ -42,6 +42,7 @@ func (p *Plugin) ApplyConfig(cfg config.Config) {
 	p.mu.Unlock()
 	path := runstate.ResolveStatePath(cfg.StatePath, cfg.DataDir)
 	p.State.SetPersistPath(path)
+	p.State.SetHistoryLimit(cfg.HistoryLimit)
 	p.Sched.Start(cfg)
 }
 

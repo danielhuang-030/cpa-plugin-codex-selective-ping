@@ -13,7 +13,7 @@
 - **固定模型** — `gpt-5.6-luna`（不可設定）
 - **每日排程** — IANA 時區 + `HH:MM`；CPA 啟動時不會立刻 ping
 - **管理 UI** — 繁中／英文／日文（跟隨 CPA 管理中心；可用 `?lang=` / `?theme=` 覆寫）
-- **保留上次執行** — `{CPA 根目錄}/data/codex-selective-ping/last_run.json`（不會寫入 `auth-dir` / `auths/`）
+- **保留上次執行** — `{CPA 根目錄}/data/codex-selective-ping/run_history.json`（不會寫入 `auth-dir` / `auths/`）
 - **插件 ID** — `codex-selective-ping` · 設定鍵 `plugins.configs.codex-selective-ping`
 
 ## 需求
@@ -74,6 +74,7 @@ plugins:
         - "11:00"
         - "16:00"
         - "21:00"
+      history_limit: 60
       accounts:
         - "user@example.com"
         - "auth_index_or_name"
@@ -108,10 +109,13 @@ cp package/codex-selective-ping.so /path/to/cpa/plugins/
 | `timezone` | string | IANA 時區（如 `Asia/Taipei`） |
 | `times` | string[] | 一個以上的 `HH:MM` |
 | `accounts` | string[] | 白名單：`auth_index`（精確）或 email／name／account（不分大小寫）。空 → 0 次 ping |
-| `data_dir` | string | 可選。`last_run.json` 所在目錄（相對路徑相對 CPA cwd） |
+| `data_dir` | string | 可選。`run_history.json` 所在目錄（相對路徑相對 CPA cwd） |
+| `history_limit` | int | 最多保留幾筆執行紀錄（預設 **60**；≤0 視為 60） |
 | `state_path` | string | 可選。上次執行檔完整路徑（優先於 `data_dir`） |
 
-預設上次執行路徑：`{CPA 根目錄}/data/codex-selective-ping/last_run.json`（`plugins/` 上一層）。
+預設上次執行路徑：`{CPA 根目錄}/data/codex-selective-ping/run_history.json`（`plugins/` 上一層）。
+
+執行歷史以新到舊寫入 `run_history.json`（預設 `{CPA 根目錄}/data/codex-selective-ping/`）。同目錄若只有舊版單一物件的 `last_run.json`，會遷移一次後刪除舊檔。
 
 ## 管理
 

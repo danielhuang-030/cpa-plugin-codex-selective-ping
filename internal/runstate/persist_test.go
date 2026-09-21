@@ -1,6 +1,7 @@
 package runstate
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -92,7 +93,7 @@ func TestResolveStatePathOverrides(t *testing.T) {
 		t.Fatalf("state_path override: got %q want %q", got, absState)
 	}
 	dataDir := t.TempDir()
-	want := filepath.Join(dataDir, "last_run.json")
+	want := filepath.Join(dataDir, "run_history.json")
 	if got := ResolveStatePath("", dataDir); got != want {
 		t.Fatalf("data_dir override: got %q want %q", got, want)
 	}
@@ -115,7 +116,7 @@ func TestDefaultStatePathUnderDataNotAuths(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := DefaultStatePath()
-	want := filepath.Join(root, "data", "codex-selective-ping", "last_run.json")
+	want := filepath.Join(root, "data", "codex-selective-ping", "run_history.json")
 	if got != want {
 		t.Fatalf("DefaultStatePath=%q want %q", got, want)
 	}
@@ -141,7 +142,7 @@ func TestResolveRelativePathsUseCwd(t *testing.T) {
 		t.Fatalf("relative state_path: got %q want %q", got, want)
 	}
 	got = ResolveStatePath("", "mydata")
-	want = filepath.Join(root, "mydata", "last_run.json")
+	want = filepath.Join(root, "mydata", "run_history.json")
 	if got != want {
 		t.Fatalf("relative data_dir: got %q want %q", got, want)
 	}
@@ -177,4 +178,113 @@ func TestDefaultStatePathWithoutPluginsIsEmpty(t *testing.T) {
 	if got := DefaultStatePath(); got != "" {
 		t.Fatalf("expected empty default without plugins/, got %q", got)
 	}
+}
+
+func TestPersistHistoryRoundTripNewestFirst(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "run_history.json")
+	s1 := NewPersisted(path)
+	s1.SetHistoryLimit(60)
+	if !s1.TryBegin() {
+		t.Fatal("begin1")
+	}
+	s1.End(Summary{At: time.Date(2026, 9, 21, 10, 0, 0, 0, time.UTC), Mode: "schedule", Message: "first"})
+	if !s1.TryBegin() {
+		t.Fatal("begin2")
+	}
+	s1.End(Summary{At: time.Date(2026, 9, 21, 11, 0, 0, 0, time.UTC), Mode: "manual", Message: "second"})
+
+	s2 := NewPersisted(path)
+	snap := s2.Snapshot(nil, nil, time.Time{})
+	if snap.LastRun == nil || snap.LastRun.Message != "second" {
+		t.Fatalf("LastRun=%#v", snap.LastRun)
+	}
+	if len(snap.RunHistory) != 2 {
+		t.Fatalf("RunHistory len=%d want 2: %#v", len(snap.RunHistory), snap.RunHistory)
+	}
+	if snap.RunHistory[0].Message != "second" || snap.RunHistory[1].Message != "first" {
+		t.Fatalf("order=%#v", snap.RunHistory)
+	}
+}
+
+func TestPersistHistoryTrimsToLimit(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "run_history.json")
+	s := NewPersisted(path)
+	s.SetHistoryLimit(2)
+	for i := 0; i < 5; i++ {
+		if !s.TryBegin() {
+			t.Fatalf("begin %d", i)
+		}
+		s.End(Summary{At: time.Date(2026, 9, 21, i, 0, 0, 0, time.UTC), Mode: "manual", Message: string(rune('a' + i))})
+	}
+	s2 := NewPersisted(path)
+	s2.SetHistoryLimit(2)
+	snap := s2.Snapshot(nil, nil, time.Time{})
+	if len(snap.RunHistory) != 2 {
+		t.Fatalf("len=%d want 2", len(snap.RunHistory))
+	}
+	if snap.RunHistory[0].Message != "e" || snap.RunHistory[1].Message != "d" {
+		t.Fatalf("kept=%#v", snap.RunHistory)
+	}
+}
+
+func TestMigrateLegacyLastRunJSON(t *testing.T) {
+	dir := t.TempDir()
+	legacy := filepath.Join(dir, "last_run.json")
+	history := filepath.Join(dir, "run_history.json")
+	sum := Summary{At: time.Date(2026, 9, 20, 8, 0, 0, 0, time.UTC), Mode: "manual", Message: "legacy", Succeeded: 1}
+	data, err := jsonMarshalForTest(sum)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(legacy, data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	s := NewPersisted(history)
+	snap := s.Snapshot(nil, nil, time.Time{})
+	if snap.LastRun == nil || snap.LastRun.Message != "legacy" {
+		t.Fatalf("LastRun=%#v", snap.LastRun)
+	}
+	if len(snap.RunHistory) != 1 {
+		t.Fatalf("history=%#v", snap.RunHistory)
+	}
+	if _, err := os.Stat(legacy); !os.IsNotExist(err) {
+		t.Fatalf("legacy must be deleted, err=%v", err)
+	}
+	if _, err := os.Stat(history); err != nil {
+		t.Fatalf("history file missing: %v", err)
+	}
+}
+
+func TestDefaultStatePathUsesRunHistoryFilename(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "plugins"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.Chdir(cwd) }()
+	if err := os.Chdir(root); err != nil {
+		t.Fatal(err)
+	}
+	got := DefaultStatePath()
+	want := filepath.Join(root, "data", "codex-selective-ping", "run_history.json")
+	if got != want {
+		t.Fatalf("DefaultStatePath=%q want %q", got, want)
+	}
+}
+
+func TestResolveDataDirUsesRunHistoryFilename(t *testing.T) {
+	dataDir := t.TempDir()
+	want := filepath.Join(dataDir, "run_history.json")
+	if got := ResolveStatePath("", dataDir); got != want {
+		t.Fatalf("got %q want %q", got, want)
+	}
+}
+
+func jsonMarshalForTest(v any) ([]byte, error) {
+	return json.MarshalIndent(v, "", "  ")
 }
