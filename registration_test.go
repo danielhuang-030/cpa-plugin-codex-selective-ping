@@ -67,7 +67,7 @@ func TestRegistrationMetaIncludesTimezoneTimesAccounts(t *testing.T) {
 	for _, f := range configFields(config.DefaultConfig()) {
 		names[f["Name"].(string)] = true
 	}
-	for _, want := range []string{"schedule_enabled", "timezone", "times", "accounts"} {
+	for _, want := range []string{"schedule_enabled", "timezone", "times", "accounts", "data_dir", "state_path"} {
 		if !names[want] {
 			t.Fatalf("missing field %q", want)
 		}

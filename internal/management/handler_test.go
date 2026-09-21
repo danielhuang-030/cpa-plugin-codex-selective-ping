@@ -2,6 +2,7 @@ package management
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"testing"
 	"time"
@@ -11,10 +12,18 @@ import (
 	"cpa-plugin-codex-selective-ping/internal/plugin"
 )
 
-type mh struct{ files []hostapi.AuthFile }
+type mh struct {
+	files []hostapi.AuthFile
+	creds map[string][]byte
+}
 
 func (m *mh) AuthList(context.Context) ([]hostapi.AuthFile, error) { return m.files, nil }
-func (m *mh) AuthGet(context.Context, string) ([]byte, error) {
+func (m *mh) AuthGet(_ context.Context, authIndex string) ([]byte, error) {
+	if m.creds != nil {
+		if raw, ok := m.creds[authIndex]; ok {
+			return raw, nil
+		}
+	}
 	return json.Marshal(map[string]any{"access_token": "t"})
 }
 func (m *mh) HTTPDo(context.Context, hostapi.HTTPRequest) (hostapi.HTTPResponse, error) {
@@ -22,6 +31,17 @@ func (m *mh) HTTPDo(context.Context, hostapi.HTTPRequest) (hostapi.HTTPResponse,
 }
 func (m *mh) AuthGetRuntime(context.Context, string) (json.RawMessage, error) {
 	return nil, hostapi.ErrUnsupported
+}
+
+func fakeIDTokenJWT(plan string) string {
+	header := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"none","typ":"JWT"}`))
+	payloadObj := map[string]any{
+		"email": "a@x.com",
+		"https://api.openai.com/auth": map[string]any{"chatgpt_plan_type": plan},
+	}
+	raw, _ := json.Marshal(payloadObj)
+	payload := base64.RawURLEncoding.EncodeToString(raw)
+	return header + "." + payload + ".sig"
 }
 
 func TestStatusShapeSelected(t *testing.T) {
@@ -115,5 +135,33 @@ func TestStatusJSONUsesScheduleEnabled(t *testing.T) {
 	}
 	if raw["schedule_enabled"] != false {
 		t.Fatalf("schedule_enabled=%v want false", raw["schedule_enabled"])
+	}
+}
+
+func TestStatusEnrichesPlanFromAuthGet(t *testing.T) {
+	tok := fakeIDTokenJWT("plus")
+	cred, _ := json.Marshal(map[string]any{"access_token": "t", "id_token": tok})
+	p := plugin.New(&mh{
+		files: []hostapi.AuthFile{
+			{AuthIndex: "1", Name: "a", Email: "a@x.com", Provider: "codex"},
+		},
+		creds: map[string][]byte{"1": cred},
+	}, "0.1.0")
+	p.ApplyConfig(config.Config{Enabled: true, Timezone: "UTC", Times: []string{"06:00"}, Accounts: []string{"1"}})
+	defer p.Shutdown()
+	h := &Handler{Plugin: p}
+	resp := h.Handle(Request{Method: "GET", Path: "/v0/management/plugins/codex-selective-ping/status"})
+	if resp.StatusCode != 200 {
+		t.Fatalf("%d %s", resp.StatusCode, resp.Body)
+	}
+	var st StatusResponse
+	if err := json.Unmarshal(resp.Body, &st); err != nil {
+		t.Fatal(err)
+	}
+	if len(st.Accounts) != 1 {
+		t.Fatalf("accounts=%d", len(st.Accounts))
+	}
+	if st.Accounts[0].Plan != "plus" {
+		t.Fatalf("plan=%q want plus (from AuthGet id_token)", st.Accounts[0].Plan)
 	}
 }

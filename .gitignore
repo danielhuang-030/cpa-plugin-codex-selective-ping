@@ -9,3 +9,6 @@ cpa-plugin-codex-auto-ping/
 dist/
 package/
 *.test
+
+# Runtime last-run state (also created by tests using default path)
+**/data/codex-selective-ping/

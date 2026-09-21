@@ -140,3 +140,31 @@ func TestRenderStatusPageCheckboxUsesAuthIndex(t *testing.T) {
 		t.Fatal("checkbox data-id must not prefer email over auth_index")
 	}
 }
+
+func TestRenderStatusPageAuthFilesQuotaEnrichJS(t *testing.T) {
+	html := RenderStatusPage(StatusResponse{
+		Enabled: true, Version: "0.1.4", Model: "gpt-5.4",
+		Timezone: "Asia/Taipei", Times: []string{"21:00"},
+		Accounts: []runstate.AccountView{
+			{AuthIndex: "auth-1", Name: "alice", Email: "a@x.com", Selected: true},
+		},
+	}, LangZhHant)
+	for _, want := range []string{
+		`data-auth-index="auth-1"`,
+		`data-col="plan"`,
+		`data-col="five_hour"`,
+		`data-col="weekly"`,
+		`/v0/management/auth-files`,
+		`/v0/management/api-call`,
+		`backend-api/wham/usage`,
+		`enrichQuotaFromManagement`,
+	} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("status page JS/markup missing %q", want)
+		}
+	}
+	// Without management key the page must keep em-dash placeholders (no invented numbers in static HTML).
+	if !strings.Contains(html, "—") {
+		t.Fatal("expected em-dash placeholders when quota unknown")
+	}
+}

@@ -11,10 +11,12 @@ import (
 var defaultTimes = []string{"06:00", "11:00", "16:00", "21:00"}
 
 type Config struct {
-	Enabled  bool     `json:"schedule_enabled"`
-	Timezone string   `json:"timezone"`
-	Times    []string `json:"times"`
-	Accounts []string `json:"accounts"`
+	Enabled   bool     `json:"schedule_enabled"`
+	Timezone  string   `json:"timezone"`
+	Times     []string `json:"times"`
+	Accounts  []string `json:"accounts"`
+	DataDir   string   `json:"data_dir,omitempty"`
+	StatePath string   `json:"state_path,omitempty"`
 }
 
 func DefaultConfig() Config {
@@ -38,6 +40,8 @@ func Parse(raw string) (Config, error) {
 			Timezone        string   `json:"timezone"`
 			Times           []string `json:"times"`
 			Accounts        []string `json:"accounts"`
+			DataDir         string   `json:"data_dir"`
+			StatePath       string   `json:"state_path"`
 		}
 		if err := json.Unmarshal([]byte(text), &p); err != nil {
 			return Config{}, fmt.Errorf("invalid JSON config: %w", err)
@@ -54,6 +58,12 @@ func Parse(raw string) (Config, error) {
 		}
 		if p.Accounts != nil {
 			cfg.Accounts = p.Accounts
+		}
+		if strings.TrimSpace(p.DataDir) != "" {
+			cfg.DataDir = strings.TrimSpace(p.DataDir)
+		}
+		if strings.TrimSpace(p.StatePath) != "" {
+			cfg.StatePath = strings.TrimSpace(p.StatePath)
 		}
 		return Validate(cfg)
 	}
@@ -113,6 +123,14 @@ func parseYAMLSubset(text string, cfg Config) (Config, error) {
 				accounts = parseInlineList(value)
 				mode = ""
 			}
+		case "data_dir":
+			if value != "" {
+				cfg.DataDir = unquote(value)
+			}
+		case "state_path":
+			if value != "" {
+				cfg.StatePath = unquote(value)
+			}
 		}
 	}
 	if times != nil {
@@ -158,6 +176,8 @@ func Validate(cfg Config) (Config, error) {
 		}
 	}
 	cfg.Accounts = outAcc
+	cfg.DataDir = strings.TrimSpace(cfg.DataDir)
+	cfg.StatePath = strings.TrimSpace(cfg.StatePath)
 	return cfg, nil
 }
 

@@ -18,6 +18,18 @@ func EnrichQuota(a AuthFile, blobs ...json.RawMessage) AuthFile {
 		if p := firstString(m, "plan", "plan_type", "planType"); p != "" {
 			a.Plan = p
 		}
+		// Nested id_token: either raw JWT string or decoded claims (auth-files).
+		if raw, ok := m["id_token"]; ok {
+			if p := PlanTypeFromAuthJSON([]byte(`{"id_token":` + string(raw) + `}`)); p != "" {
+				a.Plan = p
+			}
+		}
+		// Whole credential JSON (AuthGet) may carry id_token at top level.
+		if a.Plan == "" {
+			if p := PlanTypeFromAuthJSON(blob); p != "" {
+				a.Plan = p
+			}
+		}
 		if w := parseWindow(m, "five_hour", "fiveHour", "rate_limit_five_hour"); w != nil {
 			a.FiveHour = w
 		}

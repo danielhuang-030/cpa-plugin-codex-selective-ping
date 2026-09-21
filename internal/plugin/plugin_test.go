@@ -3,12 +3,14 @@ package plugin
 import (
 	"context"
 	"encoding/json"
+	"path/filepath"
 	"sync"
 	"testing"
 	"time"
 
 	"cpa-plugin-codex-selective-ping/internal/config"
 	"cpa-plugin-codex-selective-ping/internal/hostapi"
+	"cpa-plugin-codex-selective-ping/internal/runstate"
 )
 
 type mockHost struct {
@@ -87,10 +89,11 @@ func TestStartManualRunCollision(t *testing.T) {
 		}
 	}()
 	p.ApplyConfig(config.Config{
-		Enabled:  false,
-		Timezone: "UTC",
-		Times:    []string{"21:00"},
-		Accounts: []string{"a@x.com"},
+		Enabled:   false,
+		Timezone:  "UTC",
+		Times:     []string{"21:00"},
+		Accounts:  []string{"a@x.com"},
+		StatePath: filepath.Join(t.TempDir(), "last_run.json"),
 	})
 	if !p.StartManualRun() {
 		t.Fatal("first StartManualRun should return true")
@@ -101,5 +104,32 @@ func TestStartManualRunCollision(t *testing.T) {
 	}
 	if p.State.TryBegin() {
 		t.Fatal("TryBegin while running should fail")
+	}
+}
+
+
+func TestApplyConfigLoadsPersistedLastRun(t *testing.T) {
+	dir := t.TempDir()
+	statePath := filepath.Join(dir, "last_run.json")
+	seed := runstate.NewPersisted(statePath)
+	if !seed.TryBegin() {
+		t.Fatal("begin")
+	}
+	at := time.Date(2026, 9, 21, 15, 0, 0, 0, time.UTC)
+	seed.End(runstate.Summary{At: at, Mode: "scheduled", Succeeded: 1, Message: "seeded"})
+
+	h := &mockHost{}
+	p := New(h, "0.1.5")
+	defer p.Shutdown()
+	p.ApplyConfig(config.Config{
+		Enabled:   false,
+		Timezone:  "UTC",
+		Times:     []string{"21:00"},
+		Accounts:  []string{"a@x.com"},
+		StatePath: statePath,
+	})
+	snap := p.State.Snapshot(nil, nil, time.Time{})
+	if snap.LastRun == nil || snap.LastRun.Message != "seeded" || snap.LastRun.Mode != "scheduled" {
+		t.Fatalf("expected loaded LastRun, got %#v", snap.LastRun)
 	}
 }

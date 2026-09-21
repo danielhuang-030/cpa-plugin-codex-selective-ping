@@ -80,11 +80,7 @@ func (h *Handler) status() StatusResponse {
 		if !selector.IsCodex(f) {
 			continue
 		}
-		var runtime json.RawMessage
-		if raw, err := h.Plugin.Host.AuthGetRuntime(ctx, f.AuthIndex); err == nil {
-			runtime = raw
-		}
-		enriched = append(enriched, hostapi.EnrichQuota(f, runtime))
+		enriched = append(enriched, hostapi.EnrichFromHost(ctx, h.Plugin.Host, f))
 	}
 	snap := h.Plugin.State.Snapshot(cfg.Accounts, enriched, h.Plugin.Sched.Next())
 	return StatusResponse{
