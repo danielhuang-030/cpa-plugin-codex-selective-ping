@@ -52,7 +52,8 @@ func (h *Handler) Handle(req Request) Response {
 	path := strings.TrimSpace(req.Path)
 	switch {
 	case method == "GET" && strings.Contains(path, "/v0/resource/plugins/") && strings.HasSuffix(path, "/status"):
-		body := []byte(RenderStatusPage(h.status()))
+		lang := resolveRequestLang(req)
+		body := []byte(RenderStatusPage(h.status(), lang))
 		return Response{StatusCode: 200, Headers: map[string][]string{"content-type": {"text/html; charset=utf-8"}, "cache-control": {"no-store"}}, Body: body}
 	case method == "GET" && strings.HasSuffix(path, "/plugins/codex-selective-ping/status"):
 		body, _ := json.Marshal(h.status())
@@ -95,3 +96,47 @@ func (h *Handler) status() StatusResponse {
 	}
 }
 
+func resolveRequestLang(req Request) Lang {
+	q := firstValue(req.Query, "lang")
+	if q != "" {
+		return ResolveLang(q, "")
+	}
+	// Honor CPA language if host forwarded it (do not require client localStorage for first paint).
+	if cpa := firstHeader(req.Headers, "X-Cli-Proxy-Language", "cli-proxy-language"); cpa != "" {
+		return NormalizeLang(cpa)
+	}
+	return ResolveLang("", firstHeader(req.Headers, "Accept-Language"))
+}
+
+func firstValue(m map[string][]string, key string) string {
+	if m == nil {
+		return ""
+	}
+	if vs, ok := m[key]; ok && len(vs) > 0 {
+		return strings.TrimSpace(vs[0])
+	}
+	// case-insensitive fallback for query keys
+	for k, vs := range m {
+		if strings.EqualFold(k, key) && len(vs) > 0 {
+			return strings.TrimSpace(vs[0])
+		}
+	}
+	return ""
+}
+
+func firstHeader(h map[string][]string, keys ...string) string {
+	if h == nil {
+		return ""
+	}
+	for _, key := range keys {
+		if vs, ok := h[key]; ok && len(vs) > 0 {
+			return strings.TrimSpace(vs[0])
+		}
+		for k, vs := range h {
+			if strings.EqualFold(k, key) && len(vs) > 0 {
+				return strings.TrimSpace(vs[0])
+			}
+		}
+	}
+	return ""
+}

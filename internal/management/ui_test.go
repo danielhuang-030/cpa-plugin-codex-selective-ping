@@ -17,14 +17,20 @@ func TestRenderStatusPageChineseAndQuotaDash(t *testing.T) {
 			{AuthIndex: "1", Name: "alice", Email: "a@x.com", Selected: true, Plan: "Plus", FiveHour: &hostapi.QuotaWindow{Remaining: &rem}, Status: "success"},
 			{AuthIndex: "2", Name: "bob", Selected: false, Status: "unknown"},
 		},
-	})
+	}, LangZhHant)
 	for _, want := range []string{"概況", "排程", "帳號", "立刻執行", "儲存設定", "Management Key", "Plan", "5h", "週限", "—", "plugins/codex-selective-ping/config", "plugins/codex-selective-ping/run"} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("missing %q", want)
 		}
 	}
-	if strings.Contains(html, "localStorage") {
-		t.Fatal("must not use localStorage for key")
+	if strings.Contains(html, "localStorage.setItem") {
+		t.Fatal("must not persist Management Key via localStorage.setItem")
+	}
+	if !strings.Contains(html, `type="password"`) {
+		t.Fatal("Management Key field must be type=password")
+	}
+	if !strings.Contains(html, "不持久化") {
+		t.Fatal("zh-Hant page must note key is not persisted")
 	}
 }
 
@@ -32,7 +38,7 @@ func TestRenderStatusPageEnabledCheckbox(t *testing.T) {
 	html := RenderStatusPage(StatusResponse{
 		Enabled: true, Version: "0.1.0", Model: "gpt-5.6-luna",
 		Timezone: "Asia/Taipei", Times: []string{"21:00"},
-	})
+	}, LangZhHant)
 	if !strings.Contains(html, `id="enabled"`) {
 		t.Fatal("missing enabled checkbox control")
 	}
@@ -56,7 +62,7 @@ func TestRenderStatusPageEnabledCheckbox(t *testing.T) {
 	htmlOff := RenderStatusPage(StatusResponse{
 		Enabled: false, Version: "0.1.0", Model: "gpt-5.6-luna",
 		Timezone: "Asia/Taipei", Times: []string{"21:00"},
-	})
+	}, LangZhHant)
 	idx = strings.Index(htmlOff, `id="enabled"`)
 	if idx < 0 {
 		t.Fatal("missing enabled when disabled")
@@ -86,7 +92,7 @@ func TestRenderStatusPageCheckboxUsesAuthIndex(t *testing.T) {
 		Accounts: []runstate.AccountView{
 			{AuthIndex: "auth-42", Name: "alice", Email: "a@x.com", Selected: true},
 		},
-	})
+	}, LangZhHant)
 	if !strings.Contains(html, `data-id="auth-42"`) {
 		t.Fatalf("checkbox data-id must use auth_index when present; html snippet missing")
 	}

@@ -11,7 +11,12 @@ import (
 	"cpa-plugin-codex-selective-ping/internal/runstate"
 )
 
-func RenderStatusPage(st StatusResponse) string {
+func RenderStatusPage(st StatusResponse, lang Lang) string {
+	if lang == "" {
+		lang = LangZhHant
+	}
+	t := func(key string) string { return T(lang, key) }
+
 	next := "—"
 	if st.NextRun != nil {
 		switch v := st.NextRun.(type) {
@@ -27,13 +32,13 @@ func RenderStatusPage(st StatusResponse) string {
 			}
 		}
 	}
-	running := "否"
+	running := t("no")
 	if st.Running {
-		running = "是"
+		running = t("yes")
 	}
-	enabled := "停用"
+	enabled := t("enabled_off")
 	if st.Enabled {
-		enabled = "已啟用"
+		enabled = t("enabled_on")
 	}
 	enabledChecked := ""
 	if st.Enabled {
@@ -62,12 +67,12 @@ func RenderStatusPage(st StatusResponse) string {
 			html.EscapeString(preferID(a)), checked,
 			html.EscapeString(a.Name), html.EscapeString(a.Email), html.EscapeString(a.AuthIndex),
 			dash(a.Plan),
-			formatWindow(a.FiveHour),
-			formatWindow(a.Weekly),
+			formatWindow(a.FiveHour, lang),
+			formatWindow(a.Weekly, lang),
 			html.EscapeString(orDash(a.Status)),
 		)
 	}
-	lastBlock := `<p class="hint">尚無執行紀錄</p>`
+	lastBlock := `<p class="hint" data-i18n="no_last_run">` + html.EscapeString(t("no_last_run")) + `</p>`
 	if st.LastRun != nil {
 		lr := st.LastRun
 		var lrRows strings.Builder
@@ -83,28 +88,39 @@ func RenderStatusPage(st StatusResponse) string {
 <span class="tag">failed %d</span>
 <span class="tag">skipped %d</span>
 </div>
-<table><thead><tr><th>帳號</th><th>結果</th><th>HTTP</th><th>說明</th></tr></thead><tbody>%s</tbody></table>`,
+<table><thead><tr><th data-i18n="col_account">%s</th><th data-i18n="col_result">%s</th><th data-i18n="col_http">%s</th><th data-i18n="col_detail">%s</th></tr></thead><tbody>%s</tbody></table>`,
 			html.EscapeString(lr.Mode), html.EscapeString(lr.At.Format(time.RFC3339)),
-			lr.Succeeded, lr.Limited, lr.Failed, lr.Skipped, lrRows.String())
+			lr.Succeeded, lr.Limited, lr.Failed, lr.Skipped,
+			html.EscapeString(t("col_account")), html.EscapeString(t("col_result")),
+			html.EscapeString(t("col_http")), html.EscapeString(t("col_detail")),
+			lrRows.String())
 		if lr.Message != "" {
 			lastBlock += `<p class="hint">` + html.EscapeString(lr.Message) + `</p>`
 		}
 	}
 	timesJSON, _ := json.Marshal(st.Times)
-	banner := fmt.Sprintf("目前已勾選 %d / %d 個帳號。未勾選的不會被排程或「立刻執行」打到。", selectedN, len(st.Accounts))
+	banner := fmt.Sprintf(t("banner_selected"), selectedN, len(st.Accounts))
 	if len(st.AccountsConfig) == 0 {
-		banner = "帳號白名單為空：排程與立刻執行都不會 ping 任何人。"
+		banner = t("banner_empty")
 	}
+
+	needKey := t("need_key")
+	saving := t("saving")
+	starting := t("starting")
+
 	return fmt.Sprintf(`<!doctype html>
-<html lang="zh-Hant">
+<html lang="%s">
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Codex Selective Ping</title>
+<title>%s</title>
 <style>
 :root{--bg:#f4f6f8;--card:#fff;--text:#1f2937;--muted:#6b7280;--line:#e5e7eb;--brand:#2563eb;--chip:#eff6ff;--chip-text:#1d4ed8}
 *{box-sizing:border-box}body{margin:0;font-family:ui-sans-serif,system-ui,sans-serif;background:var(--bg);color:var(--text)}
-header{background:#111827;color:#fff;padding:16px 24px}header h1{margin:0;font-size:18px}header p{margin:4px 0 0;font-size:12px;opacity:.75}
+header{background:#111827;color:#fff;padding:16px 24px;display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
+header .titles h1{margin:0;font-size:18px}header .titles p{margin:4px 0 0;font-size:12px;opacity:.75}
+.lang-switch{display:flex;gap:6px;flex-wrap:wrap}.lang-switch a{color:#fff;text-decoration:none;font-size:12px;padding:4px 8px;border-radius:999px;border:1px solid rgba(255,255,255,.35);opacity:.85}
+.lang-switch a.active,.lang-switch a:hover{background:rgba(255,255,255,.15);opacity:1}
 main{max-width:1100px;margin:20px auto;padding:0 16px 40px;display:grid;gap:16px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 18px}
 .card h2{margin:0 0 12px;font-size:15px}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
@@ -125,55 +141,101 @@ pre{white-space:pre-wrap;background:#f6f6f6;padding:12px;border-radius:6px}
 </head>
 <body>
 <header>
-  <h1>Codex Selective Ping</h1>
-  <p>獨立 CPA 插件 · 指定帳號排程 ping</p>
+  <div class="titles">
+    <h1 data-i18n="title">%s</h1>
+    <p data-i18n="subtitle">%s</p>
+  </div>
+  <nav class="lang-switch" aria-label="language">
+    <a href="?lang=zh-Hant" class="%s" data-lang="zh-Hant">%s</a>
+    <a href="?lang=en" class="%s" data-lang="en">%s</a>
+    <a href="?lang=ja" class="%s" data-lang="ja">%s</a>
+  </nav>
 </header>
 <main>
-<section class="card"><h2>概況</h2>
+<section class="card"><h2 data-i18n="overview">%s</h2>
 <div class="grid">
-  <div class="stat"><div class="k">狀態</div><div class="v">%s</div></div>
-  <div class="stat"><div class="k">版本 / 模型</div><div class="v">%s · %s</div></div>
-  <div class="stat"><div class="k">時區 / 時段</div><div class="v">%s · %s</div></div>
-  <div class="stat"><div class="k">下次執行</div><div class="v">%s · 執行中：%s</div></div>
+  <div class="stat"><div class="k" data-i18n="status">%s</div><div class="v">%s</div></div>
+  <div class="stat"><div class="k" data-i18n="version_model">%s</div><div class="v">%s · %s</div></div>
+  <div class="stat"><div class="k" data-i18n="tz_times">%s</div><div class="v">%s · %s</div></div>
+  <div class="stat"><div class="k" data-i18n="next_run">%s</div><div class="v">%s · <span data-i18n="running_label">%s</span>：%s</div></div>
 </div></section>
-<section class="card"><h2>排程</h2>
+<section class="card"><h2 data-i18n="schedule">%s</h2>
 <div class="row" style="margin-bottom:10px">
-  <label><input id="enabled" type="checkbox"%s/> 啟用</label>
-  <label>時區</label><input id="tz" type="text" value="%s"/>
-  <label>新增時段</label><input id="new-time" type="time" value="21:00"/>
-  <button class="btn secondary" type="button" onclick="addTime()">加入</button>
+  <label><input id="enabled" type="checkbox"%s/> <span data-i18n="enable">%s</span></label>
+  <label data-i18n="timezone">%s</label><input id="tz" type="text" value="%s"/>
+  <label data-i18n="add_time">%s</label><input id="new-time" type="time" value="21:00"/>
+  <button class="btn secondary" type="button" onclick="addTime()" data-i18n="add">%s</button>
 </div>
 <div class="row" id="times"></div>
-<p class="hint">啟動時不會立刻全 ping；到點才跑。空帳號清單 = 誰都不 ping。</p>
+<p class="hint" data-i18n="schedule_hint">%s</p>
 </section>
-<section class="card"><h2>帳號</h2>
+<section class="card"><h2 data-i18n="accounts">%s</h2>
 <div class="banner" id="banner">%s</div>
 <div class="row" style="margin:12px 0">
-  <button class="btn secondary" type="button" onclick="setAll(true)">全選</button>
-  <button class="btn secondary" type="button" onclick="setAll(false)">清除</button>
+  <button class="btn secondary" type="button" onclick="setAll(true)" data-i18n="select_all">%s</button>
+  <button class="btn secondary" type="button" onclick="setAll(false)" data-i18n="clear">%s</button>
 </div>
 <table>
-<thead><tr><th></th><th>帳號</th><th>Plan</th><th>5h</th><th>週限</th><th>狀態</th></tr></thead>
+<thead><tr><th></th><th data-i18n="col_account">%s</th><th data-i18n="col_plan">%s</th><th data-i18n="col_5h">%s</th><th data-i18n="col_weekly">%s</th><th data-i18n="col_status">%s</th></tr></thead>
 <tbody>%s</tbody>
 </table>
-<p class="hint">5h／週限來自 CPA 既有資料；沒有就顯示 —，不會自己推估。額度欄只供參考，不決定是否 ping。</p>
+<p class="hint" data-i18n="accounts_hint">%s</p>
 </section>
-<section class="card"><h2>動作</h2>
+<section class="card"><h2 data-i18n="actions">%s</h2>
 <div class="row">
-  <input id="management-key" type="password" autocomplete="off" placeholder="Management Key（僅當次輸入，不持久化）"/>
-  <button class="btn" type="button" onclick="saveCfg()">儲存設定</button>
-  <button class="btn secondary" type="button" onclick="runNow()">立刻執行</button>
-  <button class="btn secondary" type="button" onclick="location.reload()">重新整理</button>
+  <input id="management-key" type="password" autocomplete="off" data-i18n-placeholder="key_placeholder" placeholder="%s"/>
+  <button class="btn" type="button" onclick="saveCfg()" data-i18n="save">%s</button>
+  <button class="btn secondary" type="button" onclick="runNow()" data-i18n="run_now">%s</button>
+  <button class="btn secondary" type="button" onclick="location.reload()" data-i18n="refresh">%s</button>
 </div>
-<p class="hint">儲存：PATCH 宿主 plugins.configs。立刻執行：只 ping 目前已儲存白名單中的帳號（請先儲存勾選）。</p>
+<p class="hint" data-i18n="actions_hint">%s</p>
 <pre id="result"></pre>
 </section>
-<section class="card"><h2>最近一次結果</h2>%s</section>
+<section class="card"><h2 data-i18n="last_run">%s</h2>%s</section>
 </main>
 <script>
 const initialTimes = %s;
 const pluginId = "codex-selective-ping";
+const serverLang = %q;
+const msgNeedKey = %q;
+const msgSaving = %q;
+const msgStarting = %q;
 let times = Array.isArray(initialTimes) ? initialTimes.slice() : [];
+
+function normalizeCPALang(raw){
+  if(!raw) return '';
+  let s = String(raw).trim();
+  if(s.charAt(0) === '{'){
+    try{
+      const j = JSON.parse(s);
+      if(j && j.state && j.state.language) s = String(j.state.language);
+      else if(j && j.language) s = String(j.language);
+    }catch(e){}
+  }
+  s = String(s).trim();
+  const lower = s.toLowerCase();
+  if(['zh-tw','zh-hant','zh-hk','zh-mo','zh_tw','zh_hant','zh_hk','zh_mo'].indexOf(lower)>=0) return 'zh-Hant';
+  if(lower === 'en' || lower.indexOf('en-')===0 || lower.indexOf('en_')===0) return 'en';
+  if(lower === 'ja' || lower.indexOf('ja-')===0 || lower.indexOf('ja_')===0) return 'ja';
+  // zh-CN / ru / anything else → zh-Hant
+  return 'zh-Hant';
+}
+
+(function alignCPALanguage(){
+  try{
+    const params = new URLSearchParams(location.search);
+    if(params.has('lang')) return; // explicit override; do not write CPA localStorage
+    const raw = localStorage.getItem('cli-proxy-language');
+    if(raw == null || raw === '') return;
+    const mapped = normalizeCPALang(raw);
+    if(mapped && mapped !== serverLang){
+      params.set('lang', mapped);
+      const q = params.toString();
+      location.replace(location.pathname + (q ? ('?' + q) : '') + location.hash);
+    }
+  }catch(e){}
+})();
+
 function renderTimes(){
   const el = document.getElementById('times');
   el.innerHTML = '';
@@ -201,9 +263,9 @@ function selectedAccounts(){
 function key(){ return document.getElementById('management-key').value.trim(); }
 async function saveCfg(){
   const o=document.getElementById('result'); const k=key();
-  if(!k){ o.textContent='需要 Management Key'; return; }
+  if(!k){ o.textContent=msgNeedKey; return; }
   const body={enabled:document.getElementById('enabled').checked, timezone:document.getElementById('tz').value.trim(), times:times, accounts:selectedAccounts()};
-  o.textContent='儲存中...';
+  o.textContent=msgSaving;
   try{
     const r=await fetch('/v0/management/plugins/codex-selective-ping/config',{method:'PATCH',headers:{'Authorization':'Bearer '+k,'Content-Type':'application/json'},body:JSON.stringify(body)});
     o.textContent=await r.text();
@@ -212,8 +274,8 @@ async function saveCfg(){
 }
 async function runNow(){
   const o=document.getElementById('result'); const k=key();
-  if(!k){ o.textContent='需要 Management Key'; return; }
-  o.textContent='啟動中...';
+  if(!k){ o.textContent=msgNeedKey; return; }
+  o.textContent=msgStarting;
   try{
     const r=await fetch('/v0/management/plugins/codex-selective-ping/run',{method:'POST',headers:{'Authorization':'Bearer '+k}});
     o.textContent=await r.text();
@@ -223,17 +285,61 @@ async function runNow(){
 renderTimes();
 </script>
 </body></html>`,
-		html.EscapeString(enabled),
+		html.EscapeString(string(lang)),
+		html.EscapeString(t("title")),
+		html.EscapeString(t("title")),
+		html.EscapeString(t("subtitle")),
+		langActive(lang, LangZhHant), html.EscapeString(t("lang_zh")),
+		langActive(lang, LangEn), html.EscapeString(t("lang_en")),
+		langActive(lang, LangJa), html.EscapeString(t("lang_ja")),
+		html.EscapeString(t("overview")),
+		html.EscapeString(t("status")), html.EscapeString(enabled),
+		html.EscapeString(t("version_model")),
 		html.EscapeString(st.Version), html.EscapeString(st.Model),
+		html.EscapeString(t("tz_times")),
 		html.EscapeString(st.Timezone), html.EscapeString(strings.Join(st.Times, " / ")),
-		html.EscapeString(next), html.EscapeString(running),
+		html.EscapeString(t("next_run")),
+		html.EscapeString(next), html.EscapeString(t("running_label")), html.EscapeString(running),
+		html.EscapeString(t("schedule")),
 		enabledChecked,
+		html.EscapeString(t("enable")),
+		html.EscapeString(t("timezone")),
 		html.EscapeString(st.Timezone),
+		html.EscapeString(t("add_time")),
+		html.EscapeString(t("add")),
+		html.EscapeString(t("schedule_hint")),
+		html.EscapeString(t("accounts")),
 		html.EscapeString(banner),
+		html.EscapeString(t("select_all")),
+		html.EscapeString(t("clear")),
+		html.EscapeString(t("col_account")),
+		html.EscapeString(t("col_plan")),
+		html.EscapeString(t("col_5h")),
+		html.EscapeString(t("col_weekly")),
+		html.EscapeString(t("col_status")),
 		rows.String(),
+		html.EscapeString(t("accounts_hint")),
+		html.EscapeString(t("actions")),
+		html.EscapeString(t("key_placeholder")),
+		html.EscapeString(t("save")),
+		html.EscapeString(t("run_now")),
+		html.EscapeString(t("refresh")),
+		html.EscapeString(t("actions_hint")),
+		html.EscapeString(t("last_run")),
 		lastBlock,
 		string(timesJSON),
+		string(lang),
+		needKey,
+		saving,
+		starting,
 	)
+}
+
+func langActive(current, target Lang) string {
+	if current == target {
+		return "active"
+	}
+	return ""
 }
 
 func preferID(a runstate.AccountView) string {
@@ -260,16 +366,16 @@ func orDash(s string) string {
 	return s
 }
 
-func formatWindow(w *hostapi.QuotaWindow) string {
+func formatWindow(w *hostapi.QuotaWindow, lang Lang) string {
 	if w == nil {
 		return "—"
 	}
 	parts := []string{}
 	if w.Remaining != nil {
-		parts = append(parts, fmt.Sprintf("剩 %.4g", *w.Remaining))
+		parts = append(parts, fmt.Sprintf("%s %.4g", T(lang, "quota_remain"), *w.Remaining))
 	}
 	if w.Used != nil {
-		parts = append(parts, fmt.Sprintf("用 %.4g", *w.Used))
+		parts = append(parts, fmt.Sprintf("%s %.4g", T(lang, "quota_used"), *w.Used))
 	}
 	main := "—"
 	if len(parts) > 0 {
@@ -277,7 +383,7 @@ func formatWindow(w *hostapi.QuotaWindow) string {
 	}
 	reset := ""
 	if w.ResetsAt != nil && !w.ResetsAt.IsZero() {
-		reset = `<small>重置 ` + html.EscapeString(w.ResetsAt.Format("01-02 15:04")) + `</small>`
+		reset = `<small>` + html.EscapeString(T(lang, "quota_reset")) + ` ` + html.EscapeString(w.ResetsAt.Format("01-02 15:04")) + `</small>`
 	}
 	if main == "—" && reset == "" {
 		return "—"
