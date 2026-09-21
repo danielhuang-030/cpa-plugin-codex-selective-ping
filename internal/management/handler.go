@@ -96,7 +96,3 @@ func (h *Handler) status() StatusResponse {
 	}
 }
 
-func RenderStatusPage(st StatusResponse) string {
-	_ = st
-	return "<!doctype html><html><body><h1>Codex Selective Ping</h1></body></html>"
-}
