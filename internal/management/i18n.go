@@ -298,6 +298,7 @@ var catalogs = map[Lang]map[string]string{
 		"principles_body":    "選択 → 保存 → 今すぐ実行は保存済みリストを使います。空なら誰にも ping しません。",
 		"principles_quota":   "参考情報",
 		"principles_persist": "再読込後も残る",
+
 		"status":             "状態",
 		"version_model":      "バージョン / モデル",
 		"tz_times":           "タイムゾーン / 時刻",

@@ -212,3 +212,22 @@ func TestLastRunChipsTranslated(t *testing.T) {
 		}
 	}
 }
+
+func TestV3DataI18nKeysPresentInAllLangs(t *testing.T) {
+	// Keys introduced / required by the v3 management UI markup.
+	keys := []string{
+		"rhythm_title", "slot_next", "slot_past",
+		"accounts_who_title", "accounts_empty_heading", "accounts_empty_title", "accounts_empty_body", "accounts_empty_cta",
+		"filter_all", "filter_selected", "filter_abnormal",
+		"rail_now", "rail_whitelist", "rail_model", "rail_key",
+		"principles_title", "principles_body", "principles_quota", "principles_persist",
+		"last_run_sub", "last_run_receipt_label", "last_run_empty_title", "last_run_empty_body",
+	}
+	for _, lang := range []Lang{LangZhHant, LangEn, LangJa} {
+		for _, key := range keys {
+			if got := T(lang, key); got == key {
+				t.Fatalf("%s missing translation for %q", lang, key)
+			}
+		}
+	}
+}
