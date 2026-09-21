@@ -1,0 +1,404 @@
+<!doctype html>
+<html lang="zh-Hant" data-theme="light">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Codex Selective Ping — product-polish mock</title>
+<style>
+  :root, :root[data-theme="light"] {
+    --canvas: #eef1f4;
+    --surface: #ffffff;
+    --surface-2: #f7f8fa;
+    --text: #0f172a;
+    --text-2: #475569;
+    --muted: #64748b;
+    --line: #e2e8f0;
+    --line-strong: #cbd5e1;
+    --accent: #1d4ed8;
+    --accent-hover: #1e40af;
+    --accent-soft: #eff6ff;
+    --accent-text: #1e3a8a;
+    --ok-bg: #ecfdf5; --ok-text: #065f46; --ok-line: #a7f3d0;
+    --warn-bg: #fff7ed; --warn-text: #9a3412; --warn-line: #fed7aa;
+    --bad-bg: #fef2f2; --bad-text: #991b1b; --bad-line: #fecaca;
+    --header-bg: #0b1220;
+    --header-text: #f8fafc;
+    --header-muted: #94a3b8;
+    --shadow: 0 1px 0 rgba(15,23,42,.04);
+    --radius: 14px;
+    --radius-sm: 10px;
+    --focus: 0 0 0 3px rgba(29,78,216,.28);
+  }
+  :root[data-theme="dark"] {
+    --canvas: #070b14;
+    --surface: #0f172a;
+    --surface-2: #111827;
+    --text: #e5e7eb;
+    --text-2: #cbd5e1;
+    --muted: #94a3b8;
+    --line: #1f2937;
+    --line-strong: #334155;
+    --accent: #3b82f6;
+    --accent-hover: #60a5fa;
+    --accent-soft: #1e3a8a;
+    --accent-text: #bfdbfe;
+    --ok-bg: #052e1c; --ok-text: #6ee7b7; --ok-line: #065f46;
+    --warn-bg: #431407; --warn-text: #fdba74; --warn-line: #9a3412;
+    --bad-bg: #450a0a; --bad-text: #fca5a5; --bad-line: #7f1d1d;
+    --header-bg: #020617;
+    --header-text: #f8fafc;
+    --header-muted: #64748b;
+    --shadow: 0 1px 0 rgba(0,0,0,.35);
+    --focus: 0 0 0 3px rgba(59,130,246,.35);
+  }
+  * { box-sizing: border-box }
+  html { color-scheme: light dark }
+  body {
+    margin: 0;
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    background: var(--canvas);
+    color: var(--text);
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { transition: none !important; animation: none !important }
+  }
+  .mock-bar {
+    position: sticky; top: 0; z-index: 20;
+    display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+    padding: 8px 16px;
+    background: #1e3a8a; color: #fff; font-size: 12px;
+  }
+  .mock-bar button {
+    border: 1px solid rgba(255,255,255,.35); background: transparent; color: #fff;
+    border-radius: 999px; padding: 4px 10px; font-size: 12px; cursor: pointer;
+  }
+  .mock-bar button.on { background: #fff; color: #1e3a8a; border-color: #fff }
+  .top {
+    background: var(--header-bg); color: var(--header-text);
+    padding: 22px 24px 20px;
+    border-bottom: 1px solid rgba(148,163,184,.18);
+  }
+  .top-inner { max-width: 1080px; margin: 0 auto; display: flex; justify-content: space-between; gap: 16px; align-items: flex-end; flex-wrap: wrap }
+  .eyebrow { margin: 0 0 6px; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--header-muted); font-weight: 600 }
+  .top h1 { margin: 0; font-size: 22px; font-weight: 650; letter-spacing: -.02em }
+  .top .sub { margin: 6px 0 0; font-size: 13px; color: var(--header-muted); max-width: 46ch }
+  .top-meta { display: flex; gap: 8px; flex-wrap: wrap; align-items: center }
+  main { max-width: 1080px; margin: 0 auto; padding: 22px 16px 56px; display: grid; gap: 16px }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 18px 20px 20px;
+  }
+  .card-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 14px }
+  .card h2 { margin: 0; font-size: 15px; font-weight: 650; letter-spacing: -.01em }
+  .card .aside { font-size: 12px; color: var(--muted) }
+  .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px }
+  @media (max-width: 860px) { .grid { grid-template-columns: repeat(2, 1fr) } }
+  .stat {
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    padding: 12px 13px;
+  }
+  .stat .k { font-size: 11px; color: var(--muted); font-weight: 600 }
+  .stat .v { margin-top: 6px; font-size: 14px; font-weight: 650; font-variant-numeric: tabular-nums }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center }
+  label.field { display: grid; gap: 6px; font-size: 12px; color: var(--muted); font-weight: 600 }
+  input[type=text], input[type=password], input[type=time] {
+    border: 1px solid var(--line-strong);
+    background: var(--surface);
+    color: var(--text);
+    border-radius: 10px;
+    padding: 9px 11px;
+    font-size: 13px;
+    min-height: 38px;
+  }
+  input[type=password] { min-width: 240px }
+  input:focus { outline: none; box-shadow: var(--focus); border-color: var(--accent) }
+  button { font: inherit; cursor: pointer }
+  .btn {
+    border: 0; border-radius: 10px; padding: 9px 14px; font-size: 13px; font-weight: 600;
+    background: var(--accent); color: #fff; transition: background .15s ease, transform .15s ease;
+  }
+  .btn:hover { background: var(--accent-hover) }
+  .btn:focus-visible { outline: none; box-shadow: var(--focus) }
+  .btn.secondary {
+    background: var(--surface-2); color: var(--text);
+    border: 1px solid var(--line-strong);
+  }
+  .btn.secondary:hover { background: var(--line) }
+  .btn.ghost {
+    background: transparent; color: var(--text-2);
+    border: 1px solid transparent;
+  }
+  .btn.ghost:hover { border-color: var(--line-strong); background: var(--surface-2) }
+  .actions-bar {
+    display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end;
+    justify-content: space-between;
+    padding-top: 4px;
+  }
+  .actions-left, .actions-right { display: flex; gap: 8px; flex-wrap: wrap; align-items: flex-end }
+  .hint { margin: 10px 0 0; font-size: 12px; color: var(--muted); line-height: 1.5 }
+  .chip {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 3px 10px; border-radius: 999px;
+    background: var(--accent-soft); color: var(--accent-text);
+    font-size: 11px; font-weight: 650; border: 1px solid transparent;
+  }
+  .chip.neutral { background: var(--surface-2); color: var(--text-2); border-color: var(--line) }
+  .chip.ok { background: var(--ok-bg); color: var(--ok-text); border-color: var(--ok-line) }
+  .chip.warn { background: var(--warn-bg); color: var(--warn-text); border-color: var(--warn-line) }
+  .chip.bad { background: var(--bad-bg); color: var(--bad-text); border-color: var(--bad-line) }
+  .chip.time { font-variant-numeric: tabular-nums }
+  .banner {
+    background: var(--warn-bg); border: 1px solid var(--warn-line); color: var(--warn-text);
+    border-radius: var(--radius-sm); padding: 11px 13px; font-size: 13px;
+  }
+  .empty {
+    border: 1px dashed var(--line-strong);
+    background: var(--surface-2);
+    border-radius: var(--radius-sm);
+    padding: 18px 16px;
+    text-align: left;
+  }
+  .empty strong { display: block; font-size: 14px; margin-bottom: 4px }
+  .empty p { margin: 0; font-size: 13px; color: var(--muted) }
+  .empty .row { margin-top: 12px }
+  table { width: 100%; border-collapse: collapse; font-size: 13px }
+  th, td { padding: 11px 8px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top }
+  th { font-size: 11px; color: var(--muted); font-weight: 700; letter-spacing: .02em }
+  tr:last-child td { border-bottom: 0 }
+  .acct { font-weight: 600 }
+  .acct small { display: block; margin-top: 3px; font-weight: 500; color: var(--muted); font-size: 11px }
+  .quota { font-variant-numeric: tabular-nums; font-weight: 650 }
+  .quota small { display: block; font-weight: 500; color: var(--muted); font-size: 11px; margin-top: 2px }
+  .schedule-chips { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px }
+  .time-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 10px; border-radius: 999px;
+    background: var(--surface-2); border: 1px solid var(--line);
+    font-size: 12px; font-variant-numeric: tabular-nums; font-weight: 650;
+  }
+  .time-chip button {
+    border: 0; background: transparent; color: var(--muted); padding: 0; font-size: 14px; line-height: 1;
+  }
+  .toggle {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-size: 13px; color: var(--text); font-weight: 600;
+  }
+  .footer-note { text-align: center; font-size: 11px; color: var(--muted); padding: 8px }
+  .hidden { display: none !important }
+</style>
+</head>
+<body>
+<div class="mock-bar">
+  <span>Mock · issue #8 product-polish · 非真實 CPA 頁</span>
+  <button type="button" id="btn-light" class="on" onclick="setTheme('light')">Light</button>
+  <button type="button" id="btn-dark" onclick="setTheme('dark')">Dark</button>
+  <button type="button" id="btn-filled" class="on" onclick="setMode('filled')">有資料</button>
+  <button type="button" id="btn-empty" onclick="setMode('empty')">空狀態</button>
+</div>
+
+<header class="top">
+  <div class="top-inner">
+    <div>
+      <p class="eyebrow">CPA Plugin</p>
+      <h1>Codex Selective Ping</h1>
+      <p class="sub">只 ping 你勾選的 Codex 帳號。排程到點才跑；額度欄僅供參考。</p>
+    </div>
+    <div class="top-meta">
+      <span class="chip ok">排程開啟</span>
+      <span class="chip neutral">v0.1.5</span>
+      <span class="chip neutral">zh-Hant</span>
+    </div>
+  </div>
+</header>
+
+<main>
+  <section class="card">
+    <div class="card-head">
+      <h2>概況</h2>
+      <span class="aside">只讀狀態</span>
+    </div>
+    <div class="grid">
+      <div class="stat"><div class="k">外層插件</div><div class="v"><span class="chip ok">已啟用</span></div></div>
+      <div class="stat"><div class="k">版本 / 模型</div><div class="v">0.1.5 · gpt-5.4-mini</div></div>
+      <div class="stat"><div class="k">時區 · 時段</div><div class="v">Asia/Taipei · 4 個</div></div>
+      <div class="stat"><div class="k">下次執行</div><div class="v">今天 21:00</div></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="card-head">
+      <h2>排程</h2>
+      <label class="toggle"><input type="checkbox" checked/> 啟用排程</label>
+    </div>
+    <div class="row" style="gap:12px;align-items:flex-end">
+      <label class="field">時區
+        <input type="text" value="Asia/Taipei"/>
+      </label>
+      <label class="field">新增時段
+        <input type="time" value="21:00"/>
+      </label>
+      <button class="btn secondary" type="button">加入</button>
+    </div>
+    <div class="schedule-chips">
+      <span class="time-chip">06:00 <button type="button" aria-label="移除">×</button></span>
+      <span class="time-chip">11:00 <button type="button" aria-label="移除">×</button></span>
+      <span class="time-chip">16:00 <button type="button" aria-label="移除">×</button></span>
+      <span class="time-chip">21:00 <button type="button" aria-label="移除">×</button></span>
+    </div>
+    <p class="hint">啟動或重載插件時不會立刻全 ping；到點才跑。白名單空白 = 誰都不 ping。</p>
+  </section>
+
+  <section class="card" id="sec-accounts-filled">
+    <div class="card-head">
+      <h2>帳號</h2>
+      <span class="aside">已選 2 / 4 · 額度僅供參考</span>
+    </div>
+    <div class="banner">已勾選 2 個帳號。未勾選的不會被排程或「立刻執行」打到。先勾選再按儲存，立刻執行才會用到新名單。</div>
+    <div class="row" style="margin:14px 0 8px">
+      <button class="btn ghost" type="button">全選</button>
+      <button class="btn ghost" type="button">清除</button>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th style="width:36px"></th>
+          <th>帳號</th>
+          <th>Plan</th>
+          <th>5h</th>
+          <th>週限</th>
+          <th>狀態</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><input type="checkbox" checked/></td>
+          <td><div class="acct">alice@example.com<small>auth_index · 12</small></div></td>
+          <td>Plus</td>
+          <td class="quota">62%<small>重置 21:40</small></td>
+          <td class="quota">81%<small>週三 08:00</small></td>
+          <td><span class="chip ok">可用</span></td>
+        </tr>
+        <tr>
+          <td><input type="checkbox" checked/></td>
+          <td><div class="acct">bob-work<small>bob@company.tw · 18</small></div></td>
+          <td>Team</td>
+          <td class="quota">18%<small>重置 19:05</small></td>
+          <td class="quota">44%<small>週一 08:00</small></td>
+          <td><span class="chip warn">接近上限</span></td>
+        </tr>
+        <tr>
+          <td><input type="checkbox"/></td>
+          <td><div class="acct">spare-codex<small>spare@example.com · 21</small></div></td>
+          <td>Free</td>
+          <td class="quota">0%<small>明天 02:11</small></td>
+          <td class="quota">0%<small>下週一</small></td>
+          <td><span class="chip bad">limited</span></td>
+        </tr>
+        <tr>
+          <td><input type="checkbox"/></td>
+          <td><div class="acct">old-token<small>auth_index · 3</small></div></td>
+          <td>—</td>
+          <td class="quota">—</td>
+          <td class="quota">—</td>
+          <td><span class="chip bad">unavailable</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="card hidden" id="sec-accounts-empty">
+    <div class="card-head">
+      <h2>帳號</h2>
+      <span class="aside">尚未選擇</span>
+    </div>
+    <div class="empty">
+      <strong>還沒有要 ping 的帳號</strong>
+      <p>勾選至少一個 Codex 帳號，按「儲存設定」，之後排程與立刻執行才會打到它們。空白白名單 = 略過所有帳號。</p>
+      <div class="row">
+        <button class="btn" type="button">查看帳號表</button>
+        <button class="btn secondary" type="button">了解白名單</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="card-head">
+      <h2>動作</h2>
+      <span class="aside">Management Key 僅當次使用</span>
+    </div>
+    <div class="actions-bar">
+      <div class="actions-left">
+        <label class="field">Management Key
+          <input type="password" placeholder="貼上後才可儲存／執行"/>
+        </label>
+      </div>
+      <div class="actions-right">
+        <button class="btn secondary" type="button">重新整理</button>
+        <button class="btn secondary" type="button">立刻執行</button>
+        <button class="btn" type="button">儲存設定</button>
+      </div>
+    </div>
+    <p class="hint">主按鈕是儲存（寫入 plugins.configs）。立刻執行使用<strong>已儲存</strong>的白名單，不是畫面上尚未儲存的勾選。</p>
+  </section>
+
+  <section class="card" id="sec-last-filled">
+    <div class="card-head">
+      <h2>最近一次結果</h2>
+      <span class="aside">持久化 · 重載後仍在</span>
+    </div>
+    <div class="row" style="margin-bottom:12px">
+      <span class="chip neutral">manual</span>
+      <span class="chip time neutral">2026-09-21 20:51</span>
+      <span class="chip ok">ok 1</span>
+      <span class="chip warn">limited 1</span>
+      <span class="chip neutral">skipped 2</span>
+    </div>
+    <table>
+      <thead><tr><th>帳號</th><th>結果</th><th>HTTP</th><th>說明</th></tr></thead>
+      <tbody>
+        <tr><td class="acct">alice@example.com</td><td><span class="chip ok">success</span></td><td>200</td><td class="hint" style="margin:0">—</td></tr>
+        <tr><td class="acct">bob-work</td><td><span class="chip warn">limited</span></td><td>429</td><td class="hint" style="margin:0">resets_at 19:05</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="card hidden" id="sec-last-empty">
+    <div class="card-head">
+      <h2>最近一次結果</h2>
+      <span class="aside">尚無紀錄</span>
+    </div>
+    <div class="empty">
+      <strong>還沒有執行紀錄</strong>
+      <p>儲存白名單後按「立刻執行」，或等排程到點。結果會寫入 data/codex-selective-ping，重載插件後仍看得到。</p>
+      <div class="row">
+        <button class="btn secondary" type="button">立刻執行</button>
+      </div>
+    </div>
+  </section>
+</main>
+<p class="footer-note">VARIANCE 7 · MOTION 4 · DENSITY 4 · path A in ui.go</p>
+<script>
+function setTheme(t){
+  document.documentElement.setAttribute('data-theme', t);
+  document.getElementById('btn-light').classList.toggle('on', t==='light');
+  document.getElementById('btn-dark').classList.toggle('on', t==='dark');
+}
+function setMode(m){
+  const empty = m==='empty';
+  document.getElementById('sec-accounts-filled').classList.toggle('hidden', empty);
+  document.getElementById('sec-accounts-empty').classList.toggle('hidden', !empty);
+  document.getElementById('sec-last-filled').classList.toggle('hidden', empty);
+  document.getElementById('sec-last-empty').classList.toggle('hidden', !empty);
+  document.getElementById('btn-filled').classList.toggle('on', !empty);
+  document.getElementById('btn-empty').classList.toggle('on', empty);
+}
+</script>
+</body>
+</html>

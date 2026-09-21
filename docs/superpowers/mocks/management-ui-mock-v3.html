@@ -1,0 +1,429 @@
+<!doctype html>
+<html lang="zh-Hant" data-theme="light">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Codex Selective Ping — redesign v3</title>
+<style>
+  :root, :root[data-theme="light"] {
+    --bg: #f6f1ea;
+    --bg-2: #efe7dc;
+    --ink: #1a1523;
+    --ink-soft: #5b534c;
+    --line: #e0d5c8;
+    --panel: #fffaf4;
+    --panel-2: #f3ebe1;
+    --accent: #c45c26;
+    --accent-ink: #fff7f0;
+    --accent-2: #2f5d50;
+    --ok: #1f7a4c; --ok-bg: #e5f6ec;
+    --warn: #a15c12; --warn-bg: #fff0d9;
+    --bad: #a11f2c; --bad-bg: #fde8ea;
+    --chip: #ece3d7;
+    --shadow: 0 18px 40px rgba(60, 40, 20, .08);
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --sans: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    --ui: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  :root[data-theme="dark"] {
+    --bg: #141018; --bg-2: #1c1620; --ink: #f4efe8; --ink-soft: #b9aea3;
+    --line: #3a3038; --panel: #1e1822; --panel-2: #261f2b;
+    --accent: #e08a52; --accent-ink: #1a1010; --accent-2: #7dbaa8;
+    --ok: #6dcaa0; --ok-bg: #1b3328; --warn: #e2b16a; --warn-bg: #3a2a14;
+    --bad: #f0a0a8; --bad-bg: #3a1a20; --chip: #2c2430;
+    --shadow: 0 18px 40px rgba(0,0,0,.35);
+  }
+  * { box-sizing: border-box }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: var(--ui); line-height: 1.45;
+  }
+  .mockbar {
+    display:flex; gap:8px; align-items:center; flex-wrap:wrap;
+    padding:8px 14px; background:#2f5d50; color:#fff; font-size:12px;
+  }
+  .mockbar button {
+    border:1px solid rgba(255,255,255,.35); background:transparent; color:#fff;
+    border-radius:999px; padding:3px 10px; cursor:pointer; font-size:12px;
+  }
+  .mockbar button.on { background:#fff; color:#2f5d50 }
+  .shell {
+    max-width: 1180px; margin: 0 auto; padding: 20px 16px 48px;
+    display: grid; grid-template-columns: 280px 1fr; gap: 18px;
+  }
+  @media (max-width: 960px) {
+    .shell { grid-template-columns: 1fr }
+  }
+  .rail {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 22px;
+    padding: 18px 16px 20px;
+    box-shadow: var(--shadow);
+    align-self: start;
+    position: sticky; top: 14px;
+  }
+  .brand {
+    font-family: var(--sans);
+    font-size: 28px; line-height: 1.05; letter-spacing: -.03em;
+    margin: 0 0 6px;
+  }
+  .brand em { font-style: italic; color: var(--accent); font-weight: 600 }
+  .lede { margin: 0 0 16px; color: var(--ink-soft); font-size: 13px }
+  .rail-block { margin-top: 16px; padding-top: 14px; border-top: 1px dashed var(--line) }
+  .rail-block h3 {
+    margin: 0 0 8px; font-size: 11px; letter-spacing: .08em;
+    text-transform: uppercase; color: var(--ink-soft); font-weight: 700;
+  }
+  .metric {
+    display:flex; justify-content:space-between; align-items:baseline;
+    padding: 8px 0; border-bottom: 1px solid var(--line);
+    font-variant-numeric: tabular-nums;
+  }
+  .metric:last-child { border-bottom: 0 }
+  .metric .k { color: var(--ink-soft); font-size: 12px }
+  .metric .v { font-weight: 700; font-size: 14px }
+  .status-pill {
+    display:inline-flex; align-items:center; gap:6px;
+    padding: 6px 10px; border-radius: 999px;
+    background: var(--ok-bg); color: var(--ok); font-size: 12px; font-weight: 700;
+  }
+  .status-pill i {
+    width:8px; height:8px; border-radius:50%; background: currentColor; display:inline-block;
+  }
+  .primary-stack { display:grid; gap:8px; margin-top: 14px }
+  button, .btn {
+    font: inherit; cursor: pointer; border-radius: 12px; border: 0;
+    padding: 10px 12px; font-weight: 700; font-size: 13px;
+  }
+  .btn-primary { background: var(--accent); color: var(--accent-ink) }
+  .btn-secondary { background: var(--panel-2); color: var(--ink); border: 1px solid var(--line) }
+  .btn-ghost { background: transparent; color: var(--ink-soft); border: 1px dashed var(--line) }
+  .field { display:grid; gap:6px; font-size:12px; color: var(--ink-soft); font-weight: 650 }
+  input[type=text], input[type=password], input[type=time] {
+    border: 1px solid var(--line); background: var(--bg);
+    border-radius: 11px; padding: 10px 11px; color: var(--ink); font: inherit;
+  }
+  .workspace { display:grid; gap: 16px }
+  .hero {
+    display:grid; grid-template-columns: 1.3fr .7fr; gap: 14px;
+  }
+  @media (max-width: 960px) { .hero { grid-template-columns: 1fr } }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 22px;
+    padding: 18px;
+    box-shadow: var(--shadow);
+  }
+  .panel h2 {
+    margin: 0 0 4px;
+    font-family: var(--sans);
+    font-size: 22px; letter-spacing: -.02em;
+  }
+  .panel .sub { margin: 0 0 14px; color: var(--ink-soft); font-size: 13px }
+  .timeline {
+    display:grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
+  }
+  @media (max-width: 800px) { .timeline { grid-template-columns: repeat(2, 1fr) } }
+  .slot {
+    background: var(--bg-2);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 12px 12px 14px;
+    position: relative;
+  }
+  .slot .t {
+    font-family: var(--mono); font-size: 20px; font-weight: 700;
+    font-variant-numeric: tabular-nums; letter-spacing: -.03em;
+  }
+  .slot .caption { margin-top: 4px; font-size: 11px; color: var(--ink-soft) }
+  .slot .x {
+    position:absolute; top:8px; right:10px; border:0; background:transparent;
+    color: var(--ink-soft); font-size: 16px; padding: 0; cursor:pointer;
+  }
+  .slot.next { outline: 2px solid var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--panel)) }
+  .slot.next .caption { color: var(--accent); font-weight: 700 }
+  .add-row { display:flex; gap:8px; flex-wrap:wrap; align-items:end; margin-top: 12px }
+  .accounts-head {
+    display:flex; justify-content:space-between; gap:12px; align-items:end; flex-wrap:wrap;
+    margin-bottom: 12px;
+  }
+  .tabs { display:flex; gap:6px; flex-wrap:wrap }
+  .tab {
+    border:1px solid var(--line); background: var(--bg-2); color: var(--ink-soft);
+    border-radius: 999px; padding: 6px 11px; font-size: 12px; font-weight: 700;
+  }
+  .tab.on { background: var(--ink); color: var(--panel); border-color: var(--ink) }
+  .account-grid { display:grid; gap: 10px }
+  .acct {
+    display:grid;
+    grid-template-columns: 28px 1.4fr .7fr .8fr .8fr auto;
+    gap: 10px; align-items: center;
+    padding: 12px 14px;
+    border-radius: 16px;
+    border: 1px solid var(--line);
+    background: var(--bg);
+  }
+  @media (max-width: 900px) {
+    .acct { grid-template-columns: 28px 1fr; }
+    .acct .hide-sm { display:none }
+  }
+  .acct.selected {
+    background: color-mix(in srgb, var(--accent-2) 10%, var(--panel));
+    border-color: color-mix(in srgb, var(--accent-2) 45%, var(--line));
+  }
+  .acct .name { font-weight: 750; font-size: 14px }
+  .acct .meta { color: var(--ink-soft); font-size: 11px; margin-top: 2px; font-family: var(--mono) }
+  .bar {
+    height: 7px; border-radius: 99px; background: var(--chip); overflow: hidden; margin-top: 5px;
+  }
+  .bar > span { display:block; height:100%; background: var(--accent-2) }
+  .bar.warn > span { background: var(--warn) }
+  .bar.bad > span { background: var(--bad) }
+  .quota-label { font-size: 11px; color: var(--ink-soft); font-variant-numeric: tabular-nums }
+  .chip {
+    display:inline-flex; align-items:center; padding: 4px 9px; border-radius: 999px;
+    font-size: 11px; font-weight: 750;
+    background: var(--chip); color: var(--ink);
+  }
+  .chip.ok { background: var(--ok-bg); color: var(--ok) }
+  .chip.warn { background: var(--warn-bg); color: var(--warn) }
+  .chip.bad { background: var(--bad-bg); color: var(--bad) }
+  .run {
+    display:grid; grid-template-columns: 160px 1fr; gap: 14px;
+  }
+  @media (max-width: 800px) { .run { grid-template-columns: 1fr } }
+  .run-summary {
+    background: var(--ink); color: var(--panel);
+    border-radius: 18px; padding: 16px;
+  }
+  .run-summary .label { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; opacity: .7 }
+  .run-summary .big {
+    font-family: var(--sans); font-size: 34px; margin: 8px 0 4px; letter-spacing: -.03em;
+  }
+  .run-summary .meta { font-size: 12px; opacity: .75; font-family: var(--mono) }
+  .run-list { display:grid; gap: 8px }
+  .run-item {
+    display:flex; justify-content:space-between; gap:10px; align-items:center;
+    padding: 10px 12px; border-radius: 14px; border: 1px solid var(--line); background: var(--bg);
+  }
+  .empty {
+    border: 1.5px dashed var(--line);
+    border-radius: 18px; padding: 22px 18px; background: var(--bg-2);
+  }
+  .empty strong { display:block; font-family: var(--sans); font-size: 20px; margin-bottom: 6px }
+  .empty p { margin: 0 0 12px; color: var(--ink-soft); font-size: 13px }
+  .hidden { display:none !important }
+  .foot { text-align:center; color: var(--ink-soft); font-size: 11px; margin-top: 8px }
+</style>
+</head>
+<body>
+<div class="mockbar">
+  <span>Mock v3 · 重新設計（非換皮）· issue #8</span>
+  <button type="button" class="on" id="btn-light" onclick="setTheme('light')">Light</button>
+  <button type="button" id="btn-dark" onclick="setTheme('dark')">Dark</button>
+  <button type="button" class="on" id="btn-filled" onclick="setMode('filled')">有資料</button>
+  <button type="button" id="btn-empty" onclick="setMode('empty')">空狀態</button>
+</div>
+
+<div class="shell">
+  <aside class="rail">
+    <p class="brand">Selective<br/><em>Ping</em></p>
+    <p class="lede">只打你勾的 Codex 帳號。排程到點才跑；額度只是參考，不擋 ping。</p>
+    <div class="status-pill"><i></i> 排程開啟 · v0.1.5</div>
+
+    <div class="rail-block">
+      <h3>此刻</h3>
+      <div class="metric"><span class="k">下次</span><span class="v">21:00</span></div>
+      <div class="metric"><span class="k">白名單</span><span class="v">2 / 4</span></div>
+      <div class="metric"><span class="k">模型</span><span class="v">gpt-5.4-mini</span></div>
+      <div class="metric"><span class="k">時區</span><span class="v">Asia/Taipei</span></div>
+    </div>
+
+    <div class="rail-block">
+      <h3>當次金鑰</h3>
+      <label class="field">Management Key
+        <input type="password" placeholder="貼上後才能儲存／執行"/>
+      </label>
+      <div class="primary-stack">
+        <button class="btn-primary" type="button">儲存設定</button>
+        <button class="btn-secondary" type="button">立刻執行</button>
+        <button class="btn-ghost" type="button">重新整理</button>
+      </div>
+    </div>
+  </aside>
+
+  <div class="workspace">
+    <section class="hero">
+      <div class="panel">
+        <h2>今天的節奏</h2>
+        <p class="sub">四個固定時段。下一個會被標成「即將」。</p>
+        <div class="timeline">
+          <div class="slot"><button class="x" type="button" aria-label="移除">×</button><div class="t">06:00</div><div class="caption">已過</div></div>
+          <div class="slot"><button class="x" type="button" aria-label="移除">×</button><div class="t">11:00</div><div class="caption">已過</div></div>
+          <div class="slot"><button class="x" type="button" aria-label="移除">×</button><div class="t">16:00</div><div class="caption">已過</div></div>
+          <div class="slot next"><button class="x" type="button" aria-label="移除">×</button><div class="t">21:00</div><div class="caption">即將 · 下次</div></div>
+        </div>
+        <div class="add-row">
+          <label class="field">時區<input type="text" value="Asia/Taipei"/></label>
+          <label class="field">新增時段<input type="time" value="21:00"/></label>
+          <button class="btn-secondary" type="button">加入時段</button>
+          <label style="display:flex;gap:8px;align-items:center;font-size:13px;font-weight:700;margin-left:auto">
+            <input type="checkbox" checked/> 啟用排程
+          </label>
+        </div>
+      </div>
+      <div class="panel" style="background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 16%, var(--panel)), var(--panel));">
+        <h2 style="font-size:20px">操作原則</h2>
+        <p class="sub">先勾帳號 → 儲存 → 立刻執行才會用到新名單。空白名單 = 誰都不打。</p>
+        <div class="metric"><span class="k">外層插件</span><span class="v"><span class="chip ok">已啟用</span></span></div>
+        <div class="metric"><span class="k">額度欄</span><span class="v">僅供參考</span></div>
+        <div class="metric"><span class="k">結果儲存</span><span class="v">重載仍在</span></div>
+      </div>
+    </section>
+
+    <section class="panel" id="sec-accounts-filled">
+      <div class="accounts-head">
+        <div>
+          <h2>要打誰</h2>
+          <p class="sub" style="margin:0">卡片式名單，不是後台大表。勾選 = 進入白名單。</p>
+        </div>
+        <div class="tabs">
+          <button class="tab on" type="button">全部 4</button>
+          <button class="tab" type="button">已選 2</button>
+          <button class="tab" type="button">異常 2</button>
+        </div>
+      </div>
+      <div class="account-grid">
+        <div class="acct selected">
+          <input type="checkbox" checked/>
+          <div>
+            <div class="name">alice@example.com</div>
+            <div class="meta">auth · 12</div>
+          </div>
+          <div class="hide-sm"><span class="chip">Plus</span></div>
+          <div class="hide-sm">
+            <div class="quota-label">5h · 62%</div>
+            <div class="bar"><span style="width:62%"></span></div>
+          </div>
+          <div class="hide-sm">
+            <div class="quota-label">週 · 81%</div>
+            <div class="bar"><span style="width:81%"></span></div>
+          </div>
+          <span class="chip ok">可用</span>
+        </div>
+        <div class="acct selected">
+          <input type="checkbox" checked/>
+          <div>
+            <div class="name">bob-work</div>
+            <div class="meta">bob@company.tw · 18</div>
+          </div>
+          <div class="hide-sm"><span class="chip">Team</span></div>
+          <div class="hide-sm">
+            <div class="quota-label">5h · 18%</div>
+            <div class="bar warn"><span style="width:18%"></span></div>
+          </div>
+          <div class="hide-sm">
+            <div class="quota-label">週 · 44%</div>
+            <div class="bar warn"><span style="width:44%"></span></div>
+          </div>
+          <span class="chip warn">接近上限</span>
+        </div>
+        <div class="acct">
+          <input type="checkbox"/>
+          <div>
+            <div class="name">spare-codex</div>
+            <div class="meta">spare@example.com · 21</div>
+          </div>
+          <div class="hide-sm"><span class="chip">Free</span></div>
+          <div class="hide-sm">
+            <div class="quota-label">5h · 0%</div>
+            <div class="bar bad"><span style="width:2%"></span></div>
+          </div>
+          <div class="hide-sm">
+            <div class="quota-label">週 · 0%</div>
+            <div class="bar bad"><span style="width:2%"></span></div>
+          </div>
+          <span class="chip bad">limited</span>
+        </div>
+        <div class="acct">
+          <input type="checkbox"/>
+          <div>
+            <div class="name">old-token</div>
+            <div class="meta">auth · 3</div>
+          </div>
+          <div class="hide-sm"><span class="chip">—</span></div>
+          <div class="hide-sm"><div class="quota-label">5h · —</div></div>
+          <div class="hide-sm"><div class="quota-label">週 · —</div></div>
+          <span class="chip bad">unavailable</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel hidden" id="sec-accounts-empty">
+      <h2>還沒有白名單</h2>
+      <div class="empty">
+        <strong>先選要保活的帳號</strong>
+        <p>至少勾一個 Codex 帳號並儲存。空白名單時，排程與立刻執行都會略過全部帳號。</p>
+        <button class="btn-primary" type="button">去選帳號</button>
+      </div>
+    </section>
+
+    <section class="panel" id="sec-last-filled">
+      <h2>上一輪回報</h2>
+      <p class="sub">像收據，不是另一張大表。</p>
+      <div class="run">
+        <div class="run-summary">
+          <div class="label">最近一次</div>
+          <div class="big">1 ok</div>
+          <div class="meta">manual · 20:51<br/>limited 1 · skipped 2</div>
+        </div>
+        <div class="run-list">
+          <div class="run-item">
+            <div>
+              <div class="name" style="font-weight:750">alice@example.com</div>
+              <div class="meta">HTTP 200</div>
+            </div>
+            <span class="chip ok">success</span>
+          </div>
+          <div class="run-item">
+            <div>
+              <div class="name" style="font-weight:750">bob-work</div>
+              <div class="meta">429 · resets 19:05</div>
+            </div>
+            <span class="chip warn">limited</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel hidden" id="sec-last-empty">
+      <h2>上一輪回報</h2>
+      <div class="empty">
+        <strong>還沒跑過</strong>
+        <p>儲存白名單後按「立刻執行」，或等排程到點。結果會留在 data/codex-selective-ping。</p>
+        <button class="btn-secondary" type="button">立刻執行</button>
+      </div>
+    </section>
+  </div>
+</div>
+<p class="foot">REDESIGN v3 · VARIANCE 8 · MOTION 4 · DENSITY 5 · warm ops / editorial console</p>
+<script>
+function setTheme(t){
+  document.documentElement.setAttribute('data-theme', t);
+  document.getElementById('btn-light').classList.toggle('on', t==='light');
+  document.getElementById('btn-dark').classList.toggle('on', t==='dark');
+}
+function setMode(m){
+  const empty = m==='empty';
+  document.getElementById('sec-accounts-filled').classList.toggle('hidden', empty);
+  document.getElementById('sec-accounts-empty').classList.toggle('hidden', !empty);
+  document.getElementById('sec-last-filled').classList.toggle('hidden', empty);
+  document.getElementById('sec-last-empty').classList.toggle('hidden', !empty);
+  document.getElementById('btn-filled').classList.toggle('on', !empty);
+  document.getElementById('btn-empty').classList.toggle('on', empty);
+}
+</script>
+</body>
+</html>
