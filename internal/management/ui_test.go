@@ -277,3 +277,17 @@ func TestRenderStatusPageLastRunEmpty(t *testing.T) {
 		t.Fatal("missing empty last-run state")
 	}
 }
+
+func TestRenderStatusPageWarmCSSTokens(t *testing.T) {
+	html := RenderStatusPage(StatusResponse{Version: "0.1.5"}, LangZhHant)
+	for _, want := range []string{
+		"--accent:",
+		`:root[data-theme="dark"]`,
+		"--bg: #f6f1ea",
+		"class=\"shell\"",
+	} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("warm CSS / landmark missing %q", want)
+		}
+	}
+}

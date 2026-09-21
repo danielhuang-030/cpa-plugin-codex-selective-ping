@@ -140,7 +140,7 @@ func TestHandlerHTMLRespectsLangQuery(t *testing.T) {
 		t.Fatalf("status %d", en.StatusCode)
 	}
 	body := string(en.Body)
-	if !strings.Contains(body, `lang="en"`) || !strings.Contains(body, "Overview") {
+	if !strings.Contains(body, `lang="en"`) || !strings.Contains(body, "Operating principles") {
 		t.Fatalf("expected English HTML, got snippet: %s", truncate(body, 200))
 	}
 
@@ -159,7 +159,7 @@ func TestHandlerHTMLRespectsLangQuery(t *testing.T) {
 		Path:   "/v0/resource/plugins/codex-selective-ping/status",
 	})
 	body = string(def.Body)
-	if !strings.Contains(body, `lang="zh-Hant"`) || !strings.Contains(body, "概況") {
+	if !strings.Contains(body, `lang="zh-Hant"`) || !strings.Contains(body, "操作原則") {
 		t.Fatalf("default should be zh-Hant; got: %s", truncate(body, 120))
 	}
 }
