@@ -48,7 +48,7 @@ Save and **restart CPA**. In Management Center → Plugin Store, install **Codex
 The store unpacks the GitHub Release zip into CPA’s plugin directory (often `plugins/`):
 
 ```text
-codex-selective-ping_0.1.6_linux_amd64.zip
+codex-selective-ping_0.1.7_linux_amd64.zip
 └── codex-selective-ping.so
 ```
 
