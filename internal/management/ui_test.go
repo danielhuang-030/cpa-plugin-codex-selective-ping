@@ -248,3 +248,32 @@ func TestRenderStatusPageRailActionsOrder(t *testing.T) {
 		t.Fatal("actions should live in rail")
 	}
 }
+
+func TestRenderStatusPageLastRunReceipt(t *testing.T) {
+	html := RenderStatusPage(StatusResponse{
+		Enabled: true, Version: "0.1.5", Model: "gpt-5.4",
+		Timezone: "Asia/Taipei", Times: []string{"21:00"},
+		LastRun: &runstate.Summary{
+			Mode: "manual", Succeeded: 1, Limited: 1, Skipped: 2, Failed: 0,
+			Accounts: []runstate.AccountResult{
+				{Name: "alice", Status: "success", HTTPStatus: 200},
+			},
+		},
+	}, LangZhHant)
+	if !strings.Contains(html, `class="run-summary"`) {
+		t.Fatal("missing run-summary receipt")
+	}
+	if !strings.Contains(html, `class="run"`) {
+		t.Fatal("missing run layout")
+	}
+}
+
+func TestRenderStatusPageLastRunEmpty(t *testing.T) {
+	html := RenderStatusPage(StatusResponse{
+		Enabled: true, Version: "0.1.5", Model: "gpt-5.4",
+		Timezone: "Asia/Taipei", Times: []string{"21:00"},
+	}, LangZhHant)
+	if !strings.Contains(html, `id="sec-last-empty"`) && !strings.Contains(html, `data-i18n="last_run_empty_title"`) {
+		t.Fatal("missing empty last-run state")
+	}
+}

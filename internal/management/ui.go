@@ -143,31 +143,31 @@ func RenderStatusPage(st StatusResponse, lang Lang) string {
 	if selectedN > 0 {
 		accountsEmptyClass = " hidden"
 	}
-	lastBlock := `<p class="hint" data-i18n="no_last_run">` + html.EscapeString(t("no_last_run")) + `</p>`
+	lastFilledClass := " hidden"
+	lastEmptyClass := ""
+	lastBlock := ""
 	if st.LastRun != nil {
+		lastFilledClass = ""
+		lastEmptyClass = " hidden"
 		lr := st.LastRun
 		var lrRows strings.Builder
 		for _, a := range lr.Accounts {
-			fmt.Fprintf(&lrRows, `<tr><td>%s</td><td>%s</td><td>%d</td><td>%s</td></tr>`,
-				html.EscapeString(a.Name), html.EscapeString(statusLabel(lang, a.Status)), a.HTTPStatus, html.EscapeString(orDash(a.Error)))
+			meta := fmt.Sprintf("HTTP %d", a.HTTPStatus)
+			if a.Error != "" {
+				meta = html.EscapeString(a.Error)
+				if a.HTTPStatus > 0 {
+					meta = fmt.Sprintf("%d · %s", a.HTTPStatus, html.EscapeString(a.Error))
+				}
+			} else if a.HTTPStatus == 0 {
+				meta = "—"
+			}
+			fmt.Fprintf(&lrRows, `<div class="run-item"><div><div class="name" style="font-weight:750">%s</div><div class="meta">%s</div></div><span class="chip %s">%s</span></div>`,
+				html.EscapeString(a.Name), meta, statusChipClass(a.Status), html.EscapeString(statusLabel(lang, a.Status)))
 		}
-		lastBlock = fmt.Sprintf(`<div class="row" style="margin-bottom:8px">
-<span class="tag">%s: %s</span>
-<span class="tag">%s</span>
-<span class="tag">%s %d</span>
-<span class="tag">%s %d</span>
-<span class="tag">%s %d</span>
-<span class="tag">%s %d</span>
-</div>
-<table><thead><tr><th data-i18n="col_account">%s</th><th data-i18n="col_result">%s</th><th data-i18n="col_http">%s</th><th data-i18n="col_detail">%s</th></tr></thead><tbody>%s</tbody></table>`,
-			html.EscapeString(t("chip_mode")), html.EscapeString(lr.Mode), html.EscapeString(lr.At.Format(time.RFC3339)),
-			html.EscapeString(t("chip_ok")), lr.Succeeded,
-			html.EscapeString(t("chip_limited")), lr.Limited,
-			html.EscapeString(t("chip_failed")), lr.Failed,
-			html.EscapeString(t("chip_skipped")), lr.Skipped,
-			html.EscapeString(t("col_account")), html.EscapeString(t("col_result")),
-			html.EscapeString(t("col_http")), html.EscapeString(t("col_detail")),
-			lrRows.String())
+		big := fmt.Sprintf("%d %s", lr.Succeeded, t("chip_ok"))
+		metaLine := fmt.Sprintf("%s · %s<br/>%s %d · %s %d", html.EscapeString(lr.Mode), html.EscapeString(lr.At.Format("15:04")), html.EscapeString(t("chip_limited")), lr.Limited, html.EscapeString(t("chip_skipped")), lr.Skipped)
+		lastBlock = fmt.Sprintf(`<div class="run"><div class="run-summary"><div class="label" data-i18n="last_run_receipt_label">%s</div><div class="big">%s</div><div class="meta">%s</div></div><div class="run-list">%s</div></div>`,
+			html.EscapeString(t("last_run_receipt_label")), html.EscapeString(big), metaLine, lrRows.String())
 		if lr.Message != "" {
 			lastBlock += `<p class="hint">` + html.EscapeString(lr.Message) + `</p>`
 		}
@@ -296,7 +296,19 @@ pre{white-space:pre-wrap;background:var(--pre);padding:12px;border-radius:6px}
     <button class="btn-primary" type="button" onclick="document.getElementById('sec-accounts-filled')?.scrollIntoView({behavior:'smooth'})" data-i18n="accounts_empty_cta">%s</button>
   </div>
 </section>
-<section class="card"><h2 data-i18n="last_run">%s</h2>%s</section>
+<section class="panel%s" id="sec-last-filled">
+<h2 data-i18n="last_run">%s</h2>
+<p class="sub" data-i18n="last_run_sub">%s</p>
+%s
+</section>
+<section class="panel%s" id="sec-last-empty">
+<h2 data-i18n="last_run">%s</h2>
+<div class="empty">
+<strong data-i18n="last_run_empty_title">%s</strong>
+<p data-i18n="last_run_empty_body">%s</p>
+<button class="btn-secondary" type="button" onclick="runNow()" data-i18n="run_now">%s</button>
+</div>
+</section>
 </div>
 </div>
 <script>
@@ -703,8 +715,15 @@ renderTimes();
 		html.EscapeString(t("accounts_empty_title")),
 		html.EscapeString(t("accounts_empty_body")),
 		html.EscapeString(t("accounts_empty_cta")),
+		lastFilledClass,
 		html.EscapeString(t("last_run")),
+		html.EscapeString(t("last_run_sub")),
 		lastBlock,
+		lastEmptyClass,
+		html.EscapeString(t("last_run")),
+		html.EscapeString(t("last_run_empty_title")),
+		html.EscapeString(t("last_run_empty_body")),
+		html.EscapeString(t("run_now")),
 		string(timesJSON),
 		nextSlot,
 		t("slot_next"),
