@@ -1,11 +1,17 @@
 # Codex Selective Ping (CPA plugin)
 
-Brand-new independent CLIProxyAPI plugin. Like `codex-auto-ping`, but only pings accounts listed in `accounts`. Empty `accounts` means ping nobody.
+[English](README.md) | [繁體中文](README.zh-Hant.md) | [日本語](README.ja.md)
+
+Independent [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) plugin. Inspired by [`cpa-plugin-codex-auto-ping`](https://github.com/jiz4oh/cpa-plugin-codex-auto-ping), but it only pings accounts listed in `accounts`. An empty `accounts` list means nobody is pinged.
 
 - Plugin ID: `codex-selective-ping`
 - Fixed model: `gpt-5.6-luna`
 - Config persistence: host `plugins.configs.codex-selective-ping`
-- Management UI: Traditional Chinese / English / Japanese (default follows CPA Management Center language)
+- Management UI: Traditional Chinese / English / Japanese (default follows the CPA Management Center language)
+
+## Reference
+
+This plugin is a new, independent project. Schedule, ping, and host ABI behaviour follow [`jiz4oh/cpa-plugin-codex-auto-ping`](https://github.com/jiz4oh/cpa-plugin-codex-auto-ping). The differences are the account allowlist, management UI, and config persistence.
 
 ## CPA configuration
 
@@ -29,9 +35,9 @@ plugins:
 
 Semantics:
 
-- `accounts` matches `auth_index` (exact) or email/name/account (case-insensitive).
+- `accounts` matches `auth_index` (exact) or email / name / account (case-insensitive).
 - Empty `accounts` → scheduled and manual runs attempt 0 pings.
-- Does not ping on CPA startup; waits for next configured time.
+- Does not ping on CPA startup; waits for the next configured time.
 
 ## Management
 
@@ -48,15 +54,15 @@ GET  /v0/management/plugins/codex-selective-ping/status
 POST /v0/management/plugins/codex-selective-ping/run
 ```
 
-Save settings from the UI via host:
+Save settings from the UI via the host:
 
 ```text
 GET/PATCH /v0/management/plugins/codex-selective-ping/config
 ```
 
-`POST .../run` returns 202, or 409 if a run is already in progress. Manual Run now still works when scheduled ping is disabled (`enabled: false`); only the daily schedule is stopped.
+`POST .../run` returns 202, or 409 if a run is already in progress. Manual **Run now** still works when scheduled ping is disabled (`enabled: false`); only the daily schedule is stopped.
 
-The resource page language follows CPA Management Center (`cli-proxy-language` / `Accept-Language`); override with `?lang=zh-Hant|en|ja`. Unsupported locales fall back to Traditional Chinese. The plugin never writes CPA's language key.
+The resource page language follows the CPA Management Center (`cli-proxy-language` / `Accept-Language`). Override with `?lang=zh-Hant|en|ja`. Unsupported locales fall back to Traditional Chinese. The plugin never writes CPA’s language key.
 
 Quota columns (Plan / 5h / weekly) show host-provided values only; missing fields render as "—".
 
@@ -84,7 +90,7 @@ macOS:
 CGO_ENABLED=1 go build -buildmode=c-shared -o codex-selective-ping.dylib .
 ```
 
-Copy the shared library into CPA's plugin directory.
+Copy the shared library into CPA’s plugin directory.
 
 ## Develop
 
