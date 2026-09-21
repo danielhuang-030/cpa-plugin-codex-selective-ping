@@ -13,21 +13,30 @@ func TestConfigFieldsIncludeEnabled(t *testing.T) {
 	if len(fields) < 1 {
 		t.Fatal("expected config fields")
 	}
-	var enabled map[string]any
+	var schedule map[string]any
 	for _, f := range fields {
-		if f["Name"] == "enabled" {
-			enabled = f
+		if f["Name"] == "schedule_enabled" {
+			schedule = f
 			break
 		}
 	}
-	if enabled == nil {
-		t.Fatal("ConfigFields must include enabled")
+	if schedule == nil {
+		t.Fatal("ConfigFields must include schedule_enabled")
 	}
-	if enabled["Type"] != "bool" {
-		t.Fatalf("enabled Type=%v want bool", enabled["Type"])
+	if schedule["Type"] != "bool" {
+		t.Fatalf("schedule_enabled Type=%v want bool", schedule["Type"])
 	}
-	if enabled["DefaultValue"] != cfg.Enabled {
-		t.Fatalf("enabled DefaultValue=%v want %v", enabled["DefaultValue"], cfg.Enabled)
+	if schedule["DefaultValue"] != cfg.Enabled {
+		t.Fatalf("schedule_enabled DefaultValue=%v want %v", schedule["DefaultValue"], cfg.Enabled)
+	}
+	desc, _ := schedule["Description"].(string)
+	if !strings.Contains(strings.ToLower(desc), "schedule") {
+		t.Fatalf("Description should mention schedule, got %q", desc)
+	}
+	for _, f := range fields {
+		if f["Name"] == "enabled" {
+			t.Fatal("ConfigFields must not expose host lifecycle key enabled")
+		}
 	}
 	meta := registrationMeta(cfg)
 	md, ok := meta["metadata"].(map[string]any)
@@ -40,12 +49,25 @@ func TestConfigFieldsIncludeEnabled(t *testing.T) {
 	}
 }
 
+func TestRegistrationConfigFieldsScheduleEnabled(t *testing.T) {
+	names := map[string]bool{}
+	for _, f := range configFields(config.DefaultConfig()) {
+		names[f["Name"].(string)] = true
+	}
+	if !names["schedule_enabled"] {
+		t.Fatal("ConfigFields name must be schedule_enabled not enabled")
+	}
+	if names["enabled"] {
+		t.Fatal("ConfigFields must not include enabled")
+	}
+}
+
 func TestRegistrationMetaIncludesTimezoneTimesAccounts(t *testing.T) {
 	names := map[string]bool{}
 	for _, f := range configFields(config.DefaultConfig()) {
 		names[f["Name"].(string)] = true
 	}
-	for _, want := range []string{"enabled", "timezone", "times", "accounts"} {
+	for _, want := range []string{"schedule_enabled", "timezone", "times", "accounts"} {
 		if !names[want] {
 			t.Fatalf("missing field %q", want)
 		}

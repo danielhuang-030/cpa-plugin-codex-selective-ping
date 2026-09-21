@@ -45,12 +45,45 @@ accounts:
 }
 
 func TestParseJSON(t *testing.T) {
-	cfg, err := Parse(`{"enabled":false,"timezone":"UTC","times":["07:30"],"accounts":["a"]}`)
+	cfg, err := Parse(`{"schedule_enabled":false,"timezone":"UTC","times":["07:30"],"accounts":["a"]}`)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if cfg.Enabled || cfg.Timezone != "UTC" || cfg.Times[0] != "07:30" || cfg.Accounts[0] != "a" {
 		t.Fatalf("%#v", cfg)
+	}
+}
+
+func TestParseScheduleEnabledIgnoresHostEnabled(t *testing.T) {
+	cfg, err := Parse("enabled: false\ntimezone: UTC\ntimes: [\"06:00\"]")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.Enabled {
+		t.Fatalf("host lifecycle enabled must be ignored for schedule; got Enabled=%v", cfg.Enabled)
+	}
+}
+
+func TestParseScheduleEnabledFalse(t *testing.T) {
+	cfg, err := Parse("schedule_enabled: false\ntimezone: UTC\ntimes: [\"06:00\"]")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Enabled {
+		t.Fatal("schedule_enabled:false must disable schedule")
+	}
+}
+
+func TestParseJSONScheduleEnabled(t *testing.T) {
+	cfg, err := Parse(`{"schedule_enabled":true,"timezone":"UTC","times":["08:00"],"enabled":false}`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.Enabled {
+		t.Fatalf("schedule_enabled:true must win over host enabled:false; got %#v", cfg)
+	}
+	if cfg.Times[0] != "08:00" {
+		t.Fatalf("times=%#v", cfg.Times)
 	}
 }
 

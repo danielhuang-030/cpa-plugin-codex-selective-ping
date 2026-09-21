@@ -22,7 +22,7 @@ https://raw.githubusercontent.com/danielhuang-030/cpa-plugin-codex-selective-pin
 共有ライブラリを CPA のプラグインディレクトリ（多くは `plugins/`）へ置くか、ストアに release zip を展開させます：
 
 ```text
-codex-selective-ping_0.1.1_linux_amd64.zip
+codex-selective-ping_0.1.2_linux_amd64.zip
 └── codex-selective-ping.so
 ```
 
@@ -35,6 +35,7 @@ plugins:
   configs:
     codex-selective-ping:
       enabled: true
+      schedule_enabled: true
       timezone: Asia/Taipei
       times:
         - "06:00"
@@ -81,8 +82,9 @@ GET/PATCH /v0/management/plugins/codex-selective-ping/config
 ```
 
 - `POST .../run` は 202。実行中なら 409 です。
-- スケジュールが無効（`enabled: false`）でも **今すぐ実行** は使えます。止まるのは日次スケジュールだけです。
+- スケジュールが無効（`schedule_enabled: false`）でも **今すぐ実行** は使えます。止まるのは日次スケジュールだけです。
 - リソースページの言語は CPA 管理センター（`cli-proxy-language` / `Accept-Language`）に従います。`?lang=zh-Hant|en|ja` で上書きできます。未対応ロケールは繁体字中国語に戻します。本プラグインは CPA の言語キーを書き込みません。
+- UI テーマは CPA（`cli-proxy-theme` など）に追従。`?theme=light|dark` で上書き可。`<html>` に `data-theme` を設定。
 - クォータ列（Plan / 5h / 週次）はホスト提供値のみ。無い場合は「—」。
 
 ## 参考

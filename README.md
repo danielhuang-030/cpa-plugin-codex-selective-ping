@@ -22,7 +22,7 @@ https://raw.githubusercontent.com/danielhuang-030/cpa-plugin-codex-selective-pin
 Place the shared library under CPA’s plugin directory (often `plugins/`), or let the store unpack the release zip there:
 
 ```text
-codex-selective-ping_0.1.1_linux_amd64.zip
+codex-selective-ping_0.1.2_linux_amd64.zip
 └── codex-selective-ping.so
 ```
 
@@ -35,6 +35,7 @@ plugins:
   configs:
     codex-selective-ping:
       enabled: true
+      schedule_enabled: true
       timezone: Asia/Taipei
       times:
         - "06:00"
@@ -81,8 +82,9 @@ GET/PATCH /v0/management/plugins/codex-selective-ping/config
 ```
 
 - `POST .../run` returns 202, or 409 if a run is already in progress.
-- Manual **Run now** still works when scheduled ping is disabled (`enabled: false`); only the daily schedule is stopped.
+- Manual **Run now** still works when scheduled ping is disabled (`schedule_enabled: false`); only the daily schedule is stopped.
 - UI language follows CPA Management Center (`cli-proxy-language` / `Accept-Language`). Override with `?lang=zh-Hant|en|ja`. Unsupported locales fall back to Traditional Chinese. The plugin never writes CPA’s language key.
+- UI theme follows CPA (`cli-proxy-theme` / `cli-proxy-color-scheme` / `theme`, then `prefers-color-scheme`). Override with `?theme=light|dark`. Applies `data-theme` on `<html>`.
 - Quota columns (Plan / 5h / weekly) show host-provided values only; missing fields render as "—".
 
 ## Reference

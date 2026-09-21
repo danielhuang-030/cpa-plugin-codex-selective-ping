@@ -39,37 +39,77 @@ func TestRenderStatusPageEnabledCheckbox(t *testing.T) {
 		Enabled: true, Version: "0.1.0", Model: "gpt-5.6-luna",
 		Timezone: "Asia/Taipei", Times: []string{"21:00"},
 	}, LangZhHant)
-	if !strings.Contains(html, `id="enabled"`) {
-		t.Fatal("missing enabled checkbox control")
+	if !strings.Contains(html, `id="schedule_enabled"`) {
+		t.Fatal("missing schedule_enabled checkbox control")
 	}
 	if !strings.Contains(html, "啟用") {
-		t.Fatal("missing 繁中 label for enabled")
+		t.Fatal("missing 繁中 label for schedule enable")
 	}
-	// Must not hardcode enabled:true on save; read from checkbox instead.
-	if strings.Contains(html, "enabled:true") {
-		t.Fatal("save must not hardcode enabled:true")
+	if strings.Contains(html, `id="enabled"`) {
+		t.Fatal("must not use id=enabled (conflicts with CPA host lifecycle)")
 	}
-	if !strings.Contains(html, `getElementById('enabled')`) && !strings.Contains(html, `getElementById("enabled")`) {
-		t.Fatal("save must read enabled from checkbox")
+	if !strings.Contains(html, `getElementById('schedule_enabled')`) && !strings.Contains(html, `getElementById("schedule_enabled")`) {
+		t.Fatal("save must read schedule_enabled from checkbox")
 	}
-	// Find enabled checkbox is checked when Enabled=true
-	idx := strings.Index(html, `id="enabled"`)
+	idx := strings.Index(html, `id="schedule_enabled"`)
 	snippet := html[idx : idx+80]
 	if !strings.Contains(snippet, "checked") {
-		t.Fatalf("enabled checkbox should be checked when st.Enabled=true; snippet=%q", snippet)
+		t.Fatalf("schedule_enabled checkbox should be checked when st.Enabled=true; snippet=%q", snippet)
 	}
 
 	htmlOff := RenderStatusPage(StatusResponse{
 		Enabled: false, Version: "0.1.0", Model: "gpt-5.6-luna",
 		Timezone: "Asia/Taipei", Times: []string{"21:00"},
 	}, LangZhHant)
-	idx = strings.Index(htmlOff, `id="enabled"`)
+	idx = strings.Index(htmlOff, `id="schedule_enabled"`)
 	if idx < 0 {
-		t.Fatal("missing enabled when disabled")
+		t.Fatal("missing schedule_enabled when disabled")
 	}
 	snippet = htmlOff[idx : idx+80]
 	if strings.Contains(snippet, "checked") {
-		t.Fatalf("enabled checkbox must not be checked when st.Enabled=false; snippet=%q", snippet)
+		t.Fatalf("schedule_enabled checkbox must not be checked when st.Enabled=false; snippet=%q", snippet)
+	}
+}
+
+func TestRenderStatusPageSaveUsesScheduleEnabledNotEnabled(t *testing.T) {
+	html := RenderStatusPage(StatusResponse{
+		Enabled: true, Version: "0.1.0", Model: "gpt-5.6-luna",
+		Timezone: "Asia/Taipei", Times: []string{"21:00"},
+	}, LangEn)
+	if !strings.Contains(html, `id="schedule_enabled"`) {
+		t.Fatal("missing id=schedule_enabled")
+	}
+	if strings.Contains(html, `getElementById('enabled')`) || strings.Contains(html, `getElementById("enabled")`) {
+		t.Fatal("must not call getElementById('enabled')")
+	}
+	// Save body object must use schedule_enabled key, not enabled
+	if !strings.Contains(html, "schedule_enabled:") && !strings.Contains(html, "schedule_enabled :") {
+		// JS object shorthand: schedule_enabled:document.getElementById(...)
+		t.Fatal("save body must include schedule_enabled key")
+	}
+	// Reject bare enabled key in save body (schedule_enabled is OK; substring "enabled:" alone is too broad).
+	if strings.Contains(html, "{enabled:") || strings.Contains(html, "{enabled :") || strings.Contains(html, ",enabled:") || strings.Contains(html, ", enabled:") {
+		t.Fatal("save JSON construction must not include enabled key")
+	}
+	if strings.Contains(html, "body={enabled:") || strings.Contains(html, "body = {enabled:") {
+		t.Fatal("save body must not start with enabled key")
+	}
+}
+
+func TestRenderStatusPageThemeSyncJS(t *testing.T) {
+	html := RenderStatusPage(StatusResponse{
+		Enabled: true, Version: "0.1.0", Model: "gpt-5.6-luna",
+		Timezone: "Asia/Taipei", Times: []string{"21:00"},
+	}, LangEn)
+	for _, want := range []string{
+		`cli-proxy-theme`,
+		`data-theme`,
+		`prefers-color-scheme`,
+		`theme=`,
+	} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("theme sync JS missing %q", want)
+		}
 	}
 }
 

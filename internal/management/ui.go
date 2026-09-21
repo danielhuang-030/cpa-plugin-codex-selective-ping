@@ -118,9 +118,10 @@ func RenderStatusPage(st StatusResponse, lang Lang) string {
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>%s</title>
 <style>
-:root{--bg:#f4f6f8;--card:#fff;--text:#1f2937;--muted:#6b7280;--line:#e5e7eb;--brand:#2563eb;--chip:#eff6ff;--chip-text:#1d4ed8}
+:root,:root[data-theme="light"]{--bg:#f4f6f8;--card:#fff;--text:#1f2937;--muted:#6b7280;--line:#e5e7eb;--brand:#2563eb;--chip:#eff6ff;--chip-text:#1d4ed8;--stat:#f9fafb;--pre:#f6f6f6;--btn-sec-bg:#e5e7eb;--btn-sec-text:#111;--banner-bg:#fff7ed;--banner-line:#fed7aa;--banner-text:#9a3412;--header-bg:#111827}
+:root[data-theme="dark"]{--bg:#0b1220;--card:#111827;--text:#e5e7eb;--muted:#9ca3af;--line:#1f2937;--brand:#3b82f6;--chip:#1e3a8a;--chip-text:#bfdbfe;--stat:#0f172a;--pre:#0f172a;--btn-sec-bg:#1f2937;--btn-sec-text:#e5e7eb;--banner-bg:#451a03;--banner-line:#9a3412;--banner-text:#fed7aa;--header-bg:#020617}
 *{box-sizing:border-box}body{margin:0;font-family:ui-sans-serif,system-ui,sans-serif;background:var(--bg);color:var(--text)}
-header{background:#111827;color:#fff;padding:16px 24px;display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
+header{background:var(--header-bg);color:#fff;padding:16px 24px;display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
 header .titles h1{margin:0;font-size:18px}header .titles p{margin:4px 0 0;font-size:12px;opacity:.75}
 .lang-switch{display:flex;gap:6px;flex-wrap:wrap}.lang-switch a{color:#fff;text-decoration:none;font-size:12px;padding:4px 8px;border-radius:999px;border:1px solid rgba(255,255,255,.35);opacity:.85}
 .lang-switch a.active,.lang-switch a:hover{background:rgba(255,255,255,.15);opacity:1}
@@ -128,18 +129,18 @@ main{max-width:1100px;margin:20px auto;padding:0 16px 40px;display:grid;gap:16px
 .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 18px}
 .card h2{margin:0 0 12px;font-size:15px}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
 @media(max-width:800px){.grid{grid-template-columns:repeat(2,1fr)}}
-.stat{background:#f9fafb;border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.stat{background:var(--stat);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
 .stat .k{font-size:11px;color:var(--muted)}.stat .v{font-size:14px;font-weight:600;margin-top:4px}
 .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}label{font-size:13px;color:var(--muted)}
 input[type=text],input[type=password],input[type=time]{border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:13px}
 input[type=password]{min-width:220px}button{border:0;border-radius:8px;padding:8px 12px;font-size:13px;cursor:pointer}
-.btn{background:var(--brand);color:#fff}.btn.secondary{background:#e5e7eb;color:#111}
+.btn{background:var(--brand);color:#fff}.btn.secondary{background:var(--btn-sec-bg);color:var(--btn-sec-text)}
 .hint{font-size:12px;color:var(--muted);margin-top:8px}
 .tag{display:inline-block;padding:2px 8px;border-radius:999px;background:var(--chip);color:var(--chip-text);font-size:11px}
 table{width:100%%;border-collapse:collapse;font-size:13px}th,td{padding:10px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
 th{font-size:11px;color:var(--muted)}.quota{font-variant-numeric:tabular-nums;white-space:nowrap}.quota small{display:block;color:var(--muted);font-size:11px}
-.banner{background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;border-radius:10px;padding:10px 12px;font-size:13px}
-pre{white-space:pre-wrap;background:#f6f6f6;padding:12px;border-radius:6px}
+.banner{background:var(--banner-bg);border:1px solid var(--banner-line);color:var(--banner-text);border-radius:10px;padding:10px 12px;font-size:13px}
+pre{white-space:pre-wrap;background:var(--pre);padding:12px;border-radius:6px}
 </style>
 </head>
 <body>
@@ -164,7 +165,7 @@ pre{white-space:pre-wrap;background:#f6f6f6;padding:12px;border-radius:6px}
 </div></section>
 <section class="card"><h2 data-i18n="schedule">%s</h2>
 <div class="row" style="margin-bottom:10px">
-  <label><input id="enabled" type="checkbox"%s/> <span data-i18n="enable">%s</span></label>
+  <label><input id="schedule_enabled" type="checkbox"%s/> <span data-i18n="enable">%s</span></label>
   <label data-i18n="timezone">%s</label><input id="tz" type="text" value="%s"/>
   <label data-i18n="add_time">%s</label><input id="new-time" type="time" value="21:00"/>
   <button class="btn secondary" type="button" onclick="addTime()" data-i18n="add">%s</button>
@@ -239,6 +240,67 @@ function normalizeCPALang(raw){
   }catch(e){}
 })();
 
+(function alignCPATheme(){
+  function normalizeTheme(raw){
+    if(raw == null || raw === '') return '';
+    let s = String(raw).trim();
+    if(s.charAt(0) === '{'){
+      try{
+        const j = JSON.parse(s);
+        if(j && j.state && j.state.theme) s = String(j.state.theme);
+        else if(j && j.theme) s = String(j.theme);
+        else if(j && j.colorScheme) s = String(j.colorScheme);
+      }catch(e){}
+    }
+    s = String(s).trim().toLowerCase();
+    if(s === 'dark' || s.indexOf('dark') >= 0) return 'dark';
+    if(s === 'light' || s.indexOf('light') >= 0) return 'light';
+    return '';
+  }
+  function readStoredTheme(){
+    const keys = ['cli-proxy-theme','cli-proxy-color-scheme','theme'];
+    for(let i=0;i<keys.length;i++){
+      try{
+        const v = localStorage.getItem(keys[i]);
+        const n = normalizeTheme(v);
+        if(n) return n;
+      }catch(e){}
+    }
+    return '';
+  }
+  function detectDomTheme(){
+    try{
+      const el = document.documentElement;
+      if(el && el.dataset && el.dataset.theme){
+        const n = normalizeTheme(el.dataset.theme);
+        if(n) return n;
+      }
+      if(el && el.classList){
+        if(el.classList.contains('dark')) return 'dark';
+        if(el.classList.contains('light')) return 'light';
+      }
+    }catch(e){}
+    return '';
+  }
+  function detectPrefers(){
+    try{
+      if(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) return 'dark';
+    }catch(e){}
+    return 'light';
+  }
+  try{
+    const params = new URLSearchParams(location.search);
+    let theme = '';
+    if(params.has('theme')) theme = normalizeTheme(params.get('theme'));
+    if(!theme) theme = readStoredTheme();
+    if(!theme) theme = detectDomTheme();
+    if(!theme) theme = detectPrefers();
+    if(theme !== 'dark' && theme !== 'light') theme = 'light';
+    document.documentElement.setAttribute('data-theme', theme);
+  }catch(e){
+    try{ document.documentElement.setAttribute('data-theme', 'light'); }catch(_){}
+  }
+})();
 
 document.querySelectorAll('.lang-switch a[data-lang]').forEach(function(a){
   a.addEventListener('click', function(e){
@@ -276,7 +338,7 @@ function key(){ return document.getElementById('management-key').value.trim(); }
 async function saveCfg(){
   const o=document.getElementById('result'); const k=key();
   if(!k){ o.textContent=msgNeedKey; return; }
-  const body={enabled:document.getElementById('enabled').checked, timezone:document.getElementById('tz').value.trim(), times:times, accounts:selectedAccounts()};
+  const body={schedule_enabled:document.getElementById('schedule_enabled').checked, timezone:document.getElementById('tz').value.trim(), times:times, accounts:selectedAccounts()};
   o.textContent=msgSaving;
   try{
     const r=await fetch('/v0/management/plugins/codex-selective-ping/config',{method:'PATCH',headers:{'Authorization':'Bearer '+k,'Content-Type':'application/json'},body:JSON.stringify(body)});

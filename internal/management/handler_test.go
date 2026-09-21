@@ -93,3 +93,27 @@ func TestRunConflict409(t *testing.T) {
 		t.Fatalf("got %d", r.StatusCode)
 	}
 }
+
+func TestStatusJSONUsesScheduleEnabled(t *testing.T) {
+	p := plugin.New(&mh{files: nil}, "0.1.0")
+	p.ApplyConfig(config.Config{Enabled: false, Timezone: "UTC", Times: []string{"06:00"}, Accounts: []string{}})
+	defer p.Shutdown()
+	h := &Handler{Plugin: p}
+	resp := h.Handle(Request{Method: "GET", Path: "/v0/management/plugins/codex-selective-ping/status"})
+	if resp.StatusCode != 200 {
+		t.Fatalf("%d %s", resp.StatusCode, resp.Body)
+	}
+	var raw map[string]any
+	if err := json.Unmarshal(resp.Body, &raw); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := raw["schedule_enabled"]; !ok {
+		t.Fatalf("status JSON must expose schedule_enabled; keys=%v", raw)
+	}
+	if _, ok := raw["enabled"]; ok {
+		t.Fatal("status JSON must not expose enabled (host lifecycle confusion)")
+	}
+	if raw["schedule_enabled"] != false {
+		t.Fatalf("schedule_enabled=%v want false", raw["schedule_enabled"])
+	}
+}

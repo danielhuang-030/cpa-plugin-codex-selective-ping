@@ -27,7 +27,7 @@ type Response struct {
 }
 
 type StatusResponse struct {
-	Enabled          bool                   `json:"enabled"`
+	Enabled          bool                   `json:"schedule_enabled"`
 	Version          string                 `json:"version"`
 	Model            string                 `json:"model"`
 	Timezone         string                 `json:"timezone"`

@@ -11,7 +11,7 @@ import (
 var defaultTimes = []string{"06:00", "11:00", "16:00", "21:00"}
 
 type Config struct {
-	Enabled  bool     `json:"enabled"`
+	Enabled  bool     `json:"schedule_enabled"`
 	Timezone string   `json:"timezone"`
 	Times    []string `json:"times"`
 	Accounts []string `json:"accounts"`
@@ -34,16 +34,17 @@ func Parse(raw string) (Config, error) {
 	}
 	if strings.HasPrefix(text, "{") {
 		var p struct {
-			Enabled  *bool    `json:"enabled"`
-			Timezone string   `json:"timezone"`
-			Times    []string `json:"times"`
-			Accounts []string `json:"accounts"`
+			ScheduleEnabled *bool    `json:"schedule_enabled"`
+			Timezone        string   `json:"timezone"`
+			Times           []string `json:"times"`
+			Accounts        []string `json:"accounts"`
 		}
 		if err := json.Unmarshal([]byte(text), &p); err != nil {
 			return Config{}, fmt.Errorf("invalid JSON config: %w", err)
 		}
-		if p.Enabled != nil {
-			cfg.Enabled = *p.Enabled
+		// Ignore host lifecycle "enabled"; only schedule_enabled controls the schedule.
+		if p.ScheduleEnabled != nil {
+			cfg.Enabled = *p.ScheduleEnabled
 		}
 		if strings.TrimSpace(p.Timezone) != "" {
 			cfg.Timezone = strings.TrimSpace(p.Timezone)
@@ -86,14 +87,16 @@ func parseYAMLSubset(text string, cfg Config) (Config, error) {
 		value := strings.TrimSpace(parts[1])
 		mode = ""
 		switch key {
-		case "enabled":
+		case "schedule_enabled":
 			if value != "" {
 				b, err := strconv.ParseBool(unquote(value))
 				if err != nil {
-					return Config{}, fmt.Errorf("enabled must be true or false")
+					return Config{}, fmt.Errorf("schedule_enabled must be true or false")
 				}
 				cfg.Enabled = b
 			}
+		case "enabled":
+			// Host lifecycle flag injected by CPA — ignore for schedule purposes.
 		case "timezone":
 			if value != "" {
 				cfg.Timezone = unquote(value)

@@ -8,12 +8,12 @@ import (
 
 const (
 	pluginName = "codex-selective-ping"
-	version    = "0.1.1"
+	version    = "0.1.2"
 )
 
 func configFields(cfg config.Config) []map[string]any {
 	return []map[string]any{
-		{"Name": "enabled", "Type": "bool", "Description": "Enable scheduled selective ping", "DefaultValue": cfg.Enabled},
+		{"Name": "schedule_enabled", "Type": "bool", "Description": "Enable daily schedule (not host plugin lifecycle)", "DefaultValue": cfg.Enabled},
 		{"Name": "timezone", "Type": "string", "Description": "IANA timezone", "DefaultValue": cfg.Timezone},
 		{"Name": "times", "Type": "string", "Description": "Daily HH:MM times", "DefaultValue": strings.Join(cfg.Times, ",")},
 		{"Name": "accounts", "Type": "string", "Description": "Whitelist of email/auth_index/name; empty=ping nobody", "DefaultValue": ""},
