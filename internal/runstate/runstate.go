@@ -131,10 +131,20 @@ func (s *State) SetNextRun(t time.Time) {
 	s.mu.Unlock()
 }
 
-func (s *State) GetAccount(authIndex string) accountMem {
+type AccountMem struct {
+	LastSuccess time.Time
+	ResetsAt    time.Time
+	EligibleAt  time.Time
+	Status      string
+	Attempts    int
+	Error       string
+}
+
+func (s *State) GetAccount(authIndex string) AccountMem {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return s.byIndex[authIndex]
+	m := s.byIndex[authIndex]
+	return AccountMem{LastSuccess: m.LastSuccess, ResetsAt: m.ResetsAt, EligibleAt: m.EligibleAt, Status: m.Status, Attempts: m.Attempts, Error: m.Error}
 }
 
 func (s *State) Snapshot(cfgAccounts []string, discovered []hostapi.AuthFile, nextOverride time.Time) StatusSnapshot {
