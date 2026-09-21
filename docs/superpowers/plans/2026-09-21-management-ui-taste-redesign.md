@@ -14,7 +14,7 @@
 - Mock source of truth: `docs/superpowers/mocks/management-ui-mock-v3.html`
 - Path A only: edit `ui.go` / `i18n.go` / tests — no HTML file extract
 - Preserve behavior: save body uses `schedule_enabled` (not host `enabled`); run-now uses saved whitelist; last-run empty vs filled; theme follows CPA `data-theme`
-- No Cloud Agent; tests: `docker compose run --rm test` (or equivalent profile)
+- No Cloud Agent; tests: `docker compose --profile tools run --rm test` (or equivalent profile)
 - sp-flow: TDD — failing test before production markup changes for each task
 - Do not bump version/release until UI tasks green and summarized (optional final task)
 
@@ -46,7 +46,7 @@ func TestRenderStatusPageV3ShellLandmarks(t *testing.T) {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `docker compose run --rm test ./internal/management/ -count=1 -run TestRenderStatusPageV3ShellLandmarks`
+Run: `docker compose --profile tools run --rm test ./internal/management/ -count=1 -run TestRenderStatusPageV3ShellLandmarks`
 
 Expected: FAIL — missing `class="shell"` (or rail/workspace)
 
@@ -62,7 +62,7 @@ Move brand/status into rail; keep old sections temporarily inside workspace if n
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `docker compose run --rm test ./internal/management/ -count=1 -run TestRenderStatusPageV3ShellLandmarks`
+Run: `docker compose --profile tools run --rm test ./internal/management/ -count=1 -run TestRenderStatusPageV3ShellLandmarks`
 
 Expected: PASS
 
@@ -83,7 +83,7 @@ git commit -m "test+feat(ui): add v3 shell/rail/workspace landmarks"
 - Modify: `internal/management/i18n.go` (keys: `rhythm_title`, `slot_next`, `slot_past` as needed)
 
 **Interfaces:**
-- Consumes: `st.Times []string`, `st.Timezone`, `st.Enabled`, next-run fields already on `StatusResponse`
+- Consumes: `st.Times []string`, `st.Timezone`, `st.Enabled`, `st.NextRun` (`interface{}` on `StatusResponse`)
 - Produces: markup with `class="timeline"`, each time as `class="slot"`, upcoming marked `class="slot next"`; keep `#schedule_enabled`, `#tz`, `#new-time`, `addTime()`
 
 - [ ] **Step 1: Write the failing test**
@@ -110,7 +110,7 @@ func TestRenderStatusPageRhythmTimeline(t *testing.T) {
 
 (Adjust `NextRun` to the real `StatusResponse` field used today for “下次執行”.)
 
-- [ ] **Step 2: Run — expect FAIL** (`docker compose run --rm test ./internal/management/ -count=1 -run TestRenderStatusPageRhythmTimeline`)
+- [ ] **Step 2: Run — expect FAIL** (`docker compose --profile tools run --rm test ./internal/management/ -count=1 -run TestRenderStatusPageRhythmTimeline`)
 
 - [ ] **Step 3: Implement timeline rendering** matching mock: replace chip row with slot grid; compute next slot from status; keep add-time controls
 
@@ -249,7 +249,7 @@ func TestRenderStatusPageRailActionsOrder(t *testing.T) {
 
 **Files:** none (verify)
 
-- [ ] **Step 1:** `docker compose run --rm test` (full `./...`)
+- [ ] **Step 1:** `docker compose --profile tools run --rm test` (full `./...`)
 
 Expected: all packages ok
 
