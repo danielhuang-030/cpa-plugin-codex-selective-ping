@@ -8,30 +8,51 @@ Independent [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) plugin. 
 - Fixed model: `gpt-5.6-luna`
 - Config persistence: host `plugins.configs.codex-selective-ping`
 - Management UI: Traditional Chinese / English / Japanese (default follows the CPA Management Center language)
+- License: [MIT](LICENSE)
 
 ## Install
 
-### 1. Plugin Store (recommended)
+### 1. Add this plugin to CPA’s Plugin Store
 
-In CPA Management Center, add this custom plugin source, then install **Codex Selective Ping**:
-
-```text
-https://raw.githubusercontent.com/danielhuang-030/cpa-plugin-codex-selective-ping/main/registry.json
-```
-
-Place the shared library under CPA’s plugin directory (often `plugins/`), or let the store unpack the release zip there:
-
-```text
-codex-selective-ping_0.1.5_linux_amd64.zip
-└── codex-selective-ping.so
-```
-
-### 2. Configure CPA
+Edit CPA’s main config file (usually `config.yaml` next to the CPA binary, or the path your deployment mounts). Under the top-level `plugins:` block, add this registry URL to `store-sources` (a list). The official store stays included automatically; this only adds an extra source.
 
 ```yaml
 plugins:
   enabled: true
   dir: plugins
+  store-sources:
+    - "https://raw.githubusercontent.com/danielhuang-030/cpa-plugin-codex-selective-ping/main/registry.json"
+  # configs: ...  # see step 3; you can leave configs empty until after install
+```
+
+Where it goes:
+
+- Same file as your other CPA settings (`port`, `auth-dir`, …), not a separate plugins-only file.
+- Sibling keys under `plugins:`: `enabled`, `dir`, `store-sources`, then later `configs`.
+- Do **not** nest `store-sources` under `configs`.
+- If `store-sources` already exists, append this URL as another list item; do not replace the whole list unless you intend to drop other custom sources.
+
+Save the file and **restart CPA** so the store reloads sources. In Management Center → Plugin Store you should see **Codex Selective Ping**. Install it from there.
+
+The store downloads the GitHub release zip into CPA’s plugin directory (often `plugins/`). Example layout for the current release:
+
+```text
+codex-selective-ping_0.1.6_linux_amd64.zip
+└── codex-selective-ping.so
+```
+
+Release assets must include a file named exactly `checksums.txt` (CPA looks up that name).
+
+### 2. Configure this plugin
+
+Still in the same `config.yaml`, under `plugins.configs`, add (or merge) a key named exactly `codex-selective-ping`:
+
+```yaml
+plugins:
+  enabled: true
+  dir: plugins
+  store-sources:
+    - "https://raw.githubusercontent.com/danielhuang-030/cpa-plugin-codex-selective-ping/main/registry.json"
   configs:
     codex-selective-ping:
       enabled: true
@@ -70,7 +91,7 @@ docker compose exec -T dev make build-linux
 cp package/codex-selective-ping.so /path/to/cpa/plugins/
 ```
 
-Then apply the YAML above and restart CPA.
+Then apply the `plugins.configs.codex-selective-ping` YAML above and restart CPA.
 
 ## Management
 
@@ -124,4 +145,11 @@ CPA’s plugin store shows `registry.json` → `version` for **uninstalled** plu
 2. `registration.go` `version`
 3. `registry.json` `plugins[0].version`
 
-Then run `make verify-version` before tagging.
+Then run `make verify-version` before tagging. Each GitHub Release must ship:
+
+- `codex-selective-ping_<version>_<goos>_<goarch>.zip`
+- `checksums.txt` (exact filename; do not use `checksums-<version>.txt` alone)
+
+## License
+
+[MIT](LICENSE)

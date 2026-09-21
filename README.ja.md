@@ -8,30 +8,51 @@
 - 固定モデル: `gpt-5.6-luna`
 - 設定の永続化: ホストの `plugins.configs.codex-selective-ping`
 - 管理 UI: 繁体字中国語 / 英語 / 日本語（既定は CPA 管理センターの言語に合わせる）
+- ライセンス: [MIT](LICENSE)
 
 ## インストール
 
-### 1. プラグインストア（推奨）
+### 1. CPA プラグインストアに追加する
 
-CPA 管理センターで次のカスタムソースを追加し、**Codex Selective Ping** をインストールします：
-
-```text
-https://raw.githubusercontent.com/danielhuang-030/cpa-plugin-codex-selective-ping/main/registry.json
-```
-
-共有ライブラリを CPA のプラグインディレクトリ（多くは `plugins/`）へ置くか、ストアに release zip を展開させます：
-
-```text
-codex-selective-ping_0.1.5_linux_amd64.zip
-└── codex-selective-ping.so
-```
-
-### 2. CPA を設定
+CPA のメイン設定ファイル（多くはバイナリ横の `config.yaml`、またはデプロイでマウントしているパス）を編集します。トップレベルの `plugins:` ブロックに、次の registry URL を `store-sources`（配列）へ**追加**します。公式ストアは常に残り、ここでは追加ソースだけを足します。
 
 ```yaml
 plugins:
   enabled: true
   dir: plugins
+  store-sources:
+    - "https://raw.githubusercontent.com/danielhuang-030/cpa-plugin-codex-selective-ping/main/registry.json"
+  # configs: ...  # 手順 2 を参照。インストール前は configs を空でも可
+```
+
+置き場所の注意:
+
+- `port` や `auth-dir` など他の CPA 設定と**同じ** `config.yaml` に書きます。別ファイルではありません。
+- `plugins:` 直下で `enabled` / `dir` / `configs` と**同じ階層**。キー名は `store-sources` です。
+- `store-sources` を `plugins.configs` の中に入れないでください。
+- 既に `store-sources` がある場合は配列に URL を1件追加し、意図なくリスト全体を上書きしないでください。
+
+保存後に **CPA を再起動**し、ストアがソースを読み直すようにします。管理センター → プラグインストアに **Codex Selective Ping** が出たら、そこからインストールします。
+
+ストアは GitHub Release の zip を CPA のプラグインディレクトリ（多くは `plugins/`）へ展開します。現行リリースの例:
+
+```text
+codex-selective-ping_0.1.6_linux_amd64.zip
+└── codex-selective-ping.so
+```
+
+Release アセットには、ファイル名が正確に `checksums.txt` のファイルが必要です（CPA はこの名前だけを探します）。
+
+### 2. このプラグインを設定する
+
+同じ `config.yaml` のまま、`plugins.configs` の下にキー名が正確に `codex-selective-ping` のブロックを追加（またはマージ）します:
+
+```yaml
+plugins:
+  enabled: true
+  dir: plugins
+  store-sources:
+    - "https://raw.githubusercontent.com/danielhuang-030/cpa-plugin-codex-selective-ping/main/registry.json"
   configs:
     codex-selective-ping:
       enabled: true
@@ -70,7 +91,7 @@ docker compose exec -T dev make build-linux
 cp package/codex-selective-ping.so /path/to/cpa/plugins/
 ```
 
-上記 YAML を適用して CPA を再起動してください。
+上記の `plugins.configs.codex-selective-ping` YAML を適用して CPA を再起動してください。
 
 ## 管理
 
@@ -124,4 +145,11 @@ CPA プラグインストアは**未インストール**時、`registry.json` �
 2. `registration.go` の `version`
 3. `registry.json` の `plugins[0].version`
 
-タグ付け前に `make verify-version` を実行。
+タグ付け前に `make verify-version` を実行。各 GitHub Release には次が必要です:
+
+- `codex-selective-ping_<version>_<goos>_<goarch>.zip`
+- `checksums.txt`（ファイル名は正確にこれ。`checksums-<version>.txt` だけでは不可）
+
+## ライセンス
+
+[MIT](LICENSE)

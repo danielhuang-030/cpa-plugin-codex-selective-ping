@@ -8,30 +8,51 @@
 - 固定模型：`gpt-5.6-luna`
 - 設定持久化：宿主 `plugins.configs.codex-selective-ping`
 - 管理 UI：繁體中文／英文／日文（預設對齊 CPA 管理中心語系）
+- 授權條款：[MIT](LICENSE)
 
 ## 安裝
 
-### 1. 插件商店（建議）
+### 1. 把本插件加進 CPA 插件商店
 
-在 CPA 管理中心新增自訂插件來源，再安裝 **Codex Selective Ping**：
-
-```text
-https://raw.githubusercontent.com/danielhuang-030/cpa-plugin-codex-selective-ping/main/registry.json
-```
-
-把動態庫放到 CPA 插件目錄（常見為 `plugins/`），或讓商店把 release zip 解到該處：
-
-```text
-codex-selective-ping_0.1.5_linux_amd64.zip
-└── codex-selective-ping.so
-```
-
-### 2. 設定 CPA
+編輯 CPA 主設定檔（通常是二進位旁的 `config.yaml`，或你部署時掛載的那個路徑）。在頂層的 `plugins:` 區塊裡，把下列 registry URL **加進** `store-sources`（陣列）。官方商店會一直保留；這裡只是多一個自訂來源。
 
 ```yaml
 plugins:
   enabled: true
   dir: plugins
+  store-sources:
+    - "https://raw.githubusercontent.com/danielhuang-030/cpa-plugin-codex-selective-ping/main/registry.json"
+  # configs: ...  # 見步驟 2；安裝前可以先不寫 configs
+```
+
+位置說明：
+
+- 跟 `port`、`auth-dir` 等其他 CPA 設定寫在**同一個** `config.yaml`，不是另一個獨立檔。
+- 在 `plugins:` 底下，與 `enabled`、`dir`、`configs` **同層**；鍵名是 `store-sources`。
+- **不要**把 `store-sources` 寫進 `plugins.configs` 裡。
+- 若本來已有 `store-sources`，請在陣列再加一筆 URL，不要整段蓋掉（除非你故意要拿掉其他來源）。
+
+存檔後**重啟 CPA**，讓商店重新載入來源。到管理中心 → 插件商店，應可看到 **Codex Selective Ping**，從那裡安裝即可。
+
+商店會把 GitHub Release 的 zip 解到 CPA 插件目錄（常見為 `plugins/`）。目前版本範例：
+
+```text
+codex-selective-ping_0.1.6_linux_amd64.zip
+└── codex-selective-ping.so
+```
+
+Release 資產必須有一個檔名剛好叫 `checksums.txt` 的檔案（CPA 只認這個名字）。
+
+### 2. 設定本插件
+
+還是同一個 `config.yaml`，在 `plugins.configs` 下新增（或合併）鍵名剛好為 `codex-selective-ping` 的區塊：
+
+```yaml
+plugins:
+  enabled: true
+  dir: plugins
+  store-sources:
+    - "https://raw.githubusercontent.com/danielhuang-030/cpa-plugin-codex-selective-ping/main/registry.json"
   configs:
     codex-selective-ping:
       enabled: true
@@ -70,7 +91,7 @@ docker compose exec -T dev make build-linux
 cp package/codex-selective-ping.so /path/to/cpa/plugins/
 ```
 
-套用上方 YAML 後重啟 CPA。
+套用上方的 `plugins.configs.codex-selective-ping` YAML 後重啟 CPA。
 
 ## 管理
 
@@ -124,4 +145,11 @@ CPA 插件商店在**未安裝**時只顯示 `registry.json` 的 `version`（不
 2. `registration.go` 的 `version`
 3. `registry.json` 的 `plugins[0].version`
 
-打 tag 前執行 `make verify-version`。
+打 tag 前執行 `make verify-version`。每個 GitHub Release 需包含：
+
+- `codex-selective-ping_<version>_<goos>_<goarch>.zip`
+- `checksums.txt`（檔名必須剛好是這個；不要只上傳 `checksums-<version>.txt`）
+
+## 授權
+
+[MIT](LICENSE)
