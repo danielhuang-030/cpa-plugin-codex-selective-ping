@@ -237,13 +237,13 @@ renderTimes();
 }
 
 func preferID(a runstate.AccountView) string {
+	if a.AuthIndex != "" {
+		return a.AuthIndex
+	}
 	if a.Email != "" {
 		return a.Email
 	}
-	if a.Name != "" {
-		return a.Name
-	}
-	return a.AuthIndex
+	return a.Name
 }
 
 func dash(s string) string {

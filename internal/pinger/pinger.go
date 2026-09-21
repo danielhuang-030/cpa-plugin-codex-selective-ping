@@ -65,7 +65,7 @@ type upstreamErrorEnvelope struct {
 	} `json:"error"`
 }
 
-func PingAccount(ctx context.Context, h hostapi.Host, a hostapi.AuthFile, force bool, lastSuccess, prevResets time.Time) Outcome {
+func PingAccount(ctx context.Context, h hostapi.Host, a hostapi.AuthFile, force bool, lastSuccess time.Time) Outcome {
 	base := Outcome{}
 	if !force && !lastSuccess.IsZero() {
 		eligible := lastSuccess.Add(WindowInterval + WindowGuard)

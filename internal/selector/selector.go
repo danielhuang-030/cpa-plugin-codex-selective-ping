@@ -9,9 +9,8 @@ import (
 func IsCodex(a hostapi.AuthFile) bool {
 	p := strings.ToLower(strings.TrimSpace(a.Provider))
 	typ := strings.ToLower(strings.TrimSpace(a.Type))
-	n := strings.ToLower(strings.TrimSpace(a.Name))
 	return p == "codex" || typ == "codex" ||
-		strings.Contains(p, "codex") || strings.Contains(typ, "codex") || strings.Contains(n, "codex")
+		strings.Contains(p, "codex") || strings.Contains(typ, "codex")
 }
 
 func Select(files []hostapi.AuthFile, accounts []string) []hostapi.AuthFile {

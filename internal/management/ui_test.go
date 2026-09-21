@@ -66,3 +66,31 @@ func TestRenderStatusPageEnabledCheckbox(t *testing.T) {
 		t.Fatalf("enabled checkbox must not be checked when st.Enabled=false; snippet=%q", snippet)
 	}
 }
+
+func TestPreferIDAuthIndexFirst(t *testing.T) {
+	if got := preferID(runstate.AccountView{AuthIndex: "idx-7", Email: "a@x.com", Name: "alice"}); got != "idx-7" {
+		t.Fatalf("prefer auth_index when present: got %q", got)
+	}
+	if got := preferID(runstate.AccountView{Email: "a@x.com", Name: "alice"}); got != "a@x.com" {
+		t.Fatalf("prefer email when no auth_index: got %q", got)
+	}
+	if got := preferID(runstate.AccountView{Name: "alice"}); got != "alice" {
+		t.Fatalf("prefer name last: got %q", got)
+	}
+}
+
+func TestRenderStatusPageCheckboxUsesAuthIndex(t *testing.T) {
+	html := RenderStatusPage(StatusResponse{
+		Enabled: true, Version: "0.1.0", Model: "gpt-5.6-luna",
+		Timezone: "Asia/Taipei", Times: []string{"21:00"},
+		Accounts: []runstate.AccountView{
+			{AuthIndex: "auth-42", Name: "alice", Email: "a@x.com", Selected: true},
+		},
+	})
+	if !strings.Contains(html, `data-id="auth-42"`) {
+		t.Fatalf("checkbox data-id must use auth_index when present; html snippet missing")
+	}
+	if strings.Contains(html, `data-id="a@x.com"`) {
+		t.Fatal("checkbox data-id must not prefer email over auth_index")
+	}
+}

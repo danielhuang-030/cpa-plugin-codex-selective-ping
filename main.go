@@ -46,17 +46,11 @@ import "C"
 import (
 	"encoding/json"
 	"fmt"
-	"strings"
 	"unsafe"
 
 	"cpa-plugin-codex-selective-ping/internal/config"
 	"cpa-plugin-codex-selective-ping/internal/management"
 	"cpa-plugin-codex-selective-ping/internal/plugin"
-)
-
-const (
-	pluginName = "codex-selective-ping"
-	version    = "0.1.0"
 )
 
 var app = plugin.New(cpaHost{}, version)
@@ -160,20 +154,7 @@ func selectivePingPluginFreeBuffer(ptr unsafe.Pointer, length C.size_t) {
 func selectivePingPluginShutdown() { app.Shutdown() }
 
 func registrationResult() map[string]any {
-	cfg := config.DefaultConfig()
-	return map[string]any{
-		"schema_version": 5,
-		"metadata": map[string]any{
-			"Name": pluginName, "Version": version, "Author": "danielhuang",
-			"Description": "Selectively ping configured Codex OAuth accounts on a daily schedule.",
-			"ConfigFields": []map[string]any{
-				{"Name": "timezone", "Type": "string", "Description": "IANA timezone", "DefaultValue": cfg.Timezone},
-				{"Name": "times", "Type": "string", "Description": "Daily HH:MM times", "DefaultValue": strings.Join(cfg.Times, ",")},
-				{"Name": "accounts", "Type": "string", "Description": "Whitelist of email/auth_index/name; empty=ping nobody", "DefaultValue": ""},
-			},
-		},
-		"capabilities": map[string]any{"management_api": true},
-	}
+	return registrationMeta(config.DefaultConfig())
 }
 
 func managementRegistrationResult() map[string]any {

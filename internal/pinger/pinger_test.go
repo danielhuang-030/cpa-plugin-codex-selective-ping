@@ -46,7 +46,7 @@ func tpanic(s string) { panic(s) }
 
 func TestPingSuccess(t *testing.T) {
 	h := &mockHost{token: "tok", account: "acc", status: 200}
-	out := PingAccount(context.Background(), h, hostapi.AuthFile{AuthIndex: "1", Name: "a"}, true, time.Time{}, time.Time{})
+	out := PingAccount(context.Background(), h, hostapi.AuthFile{AuthIndex: "1", Name: "a"}, true, time.Time{})
 	if out.Status != "success" || out.HTTPStatus != 200 || out.Attempts != 1 {
 		t.Fatalf("%#v", out)
 	}
@@ -57,7 +57,7 @@ func TestPingLimitedUsage(t *testing.T) {
 		"error": map[string]any{"type": "usage_limit_reached", "message": "slow down", "resets_at": time.Now().Add(time.Hour).Unix()},
 	})
 	h := &mockHost{token: "tok", status: 429, body: body}
-	out := PingAccount(context.Background(), h, hostapi.AuthFile{AuthIndex: "1"}, true, time.Time{}, time.Time{})
+	out := PingAccount(context.Background(), h, hostapi.AuthFile{AuthIndex: "1"}, true, time.Time{})
 	if out.Status != "limited" {
 		t.Fatalf("%#v", out)
 	}
@@ -75,7 +75,7 @@ func TestPingRetriesThenFails(t *testing.T) {
 	old := retryDelayFn
 	retryDelayFn = func(int) time.Duration { return time.Millisecond }
 	defer func() { retryDelayFn = old }()
-	out := PingAccount(ctx, h, hostapi.AuthFile{AuthIndex: "1"}, true, time.Time{}, time.Time{})
+	out := PingAccount(ctx, h, hostapi.AuthFile{AuthIndex: "1"}, true, time.Time{})
 	if out.Status != "failed" || out.Attempts != MaxAttempts {
 		t.Fatalf("%#v calls=%d", out, h.calls)
 	}
@@ -89,7 +89,7 @@ func TestPingBare429LimitedNoRetry(t *testing.T) {
 	old := retryDelayFn
 	retryDelayFn = func(int) time.Duration { return time.Millisecond }
 	defer func() { retryDelayFn = old }()
-	out := PingAccount(context.Background(), h, hostapi.AuthFile{AuthIndex: "1"}, true, time.Time{}, time.Time{})
+	out := PingAccount(context.Background(), h, hostapi.AuthFile{AuthIndex: "1"}, true, time.Time{})
 	if out.Status != "limited" {
 		t.Fatalf("status=%q want limited; %#v", out.Status, out)
 	}

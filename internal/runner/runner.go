@@ -92,7 +92,7 @@ func (r *Runner) RunClaimed(parent context.Context, cfg config.Config, force boo
 		go func(auth hostapi.AuthFile) {
 			defer wg.Done()
 			mem := r.State.GetAccount(auth.AuthIndex)
-			out := pinger.PingAccount(ctx, r.Host, auth, force, mem.LastSuccess, mem.ResetsAt)
+			out := pinger.PingAccount(ctx, r.Host, auth, force, mem.LastSuccess)
 			res := runstate.AccountResult{
 				AuthIndex: auth.AuthIndex, Name: nameOf(auth), Email: auth.Email, Unavailable: auth.Unavailable,
 				Status: out.Status, Attempts: out.Attempts, HTTPStatus: out.HTTPStatus, Error: out.Error,

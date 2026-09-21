@@ -64,3 +64,14 @@ func TestSelectMultipleStableOrder(t *testing.T) {
 		t.Fatalf("order=%#v", got)
 	}
 }
+
+func TestIsCodexIgnoresNameContains(t *testing.T) {
+	a := hostapi.AuthFile{AuthIndex: "9", Name: "my-codex-notes", Email: "n@x.com", Provider: "gemini"}
+	if IsCodex(a) {
+		t.Fatalf("name containing codex must not match when provider/type are non-codex: %#v", a)
+	}
+	got := Select([]hostapi.AuthFile{a}, []string{"my-codex-notes", "n@x.com", "9"})
+	if len(got) != 0 {
+		t.Fatalf("must not select gemini account with codex in name: %#v", got)
+	}
+}
