@@ -919,20 +919,28 @@ func TestRenderStatusPageRunningBanner(t *testing.T) {
 
 func TestRenderStatusPageMobileRailStatic(t *testing.T) {
 	html := RenderStatusPage(StatusResponse{Version: "0.1.9"}, LangZhHant)
-	mediaIdx := strings.Index(html, `@media (max-width: 960px)`)
-	if mediaIdx < 0 {
-		t.Fatal("expected @media (max-width: 960px) for mobile layout")
+	minIdx := strings.Index(html, `@media (min-width: 961px)`)
+	if minIdx < 0 {
+		t.Fatal("expected @media (min-width: 961px) so sticky rail only applies on desktop")
 	}
-	// Search within a reasonable window after the media query for .rail { position: static }
-	window := html[mediaIdx:]
-	if len(window) > 800 {
-		window = window[:800]
+	window := html[minIdx:]
+	if len(window) > 400 {
+		window = window[:400]
 	}
-	if !strings.Contains(window, `.rail`) {
-		t.Fatal("mobile @media (max-width: 960px) must target .rail")
+	if !strings.Contains(window, `position: sticky`) && !strings.Contains(window, `position:sticky`) {
+		t.Fatal("desktop min-width media must set .rail position: sticky")
 	}
-	if !strings.Contains(window, `position: static`) && !strings.Contains(window, `position:static`) {
-		t.Fatal("mobile .rail must use position: static to avoid sticky overlap")
+	// Base .rail rule must not set sticky, or it would override any earlier mobile static rule.
+	railIdx := strings.Index(html, `.rail {`)
+	if railIdx < 0 {
+		t.Fatal("missing .rail rule")
+	}
+	if railIdx > minIdx {
+		t.Fatal("expected base .rail rule before min-width sticky media")
+	}
+	base := html[railIdx:minIdx]
+	if strings.Contains(base, `position: sticky`) || strings.Contains(base, `position:sticky`) {
+		t.Fatal("base .rail must not set position:sticky (cascade would keep sticky on mobile)")
 	}
 }
 
