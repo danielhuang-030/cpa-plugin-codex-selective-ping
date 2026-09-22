@@ -7,10 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"cpa-plugin-codex-selective-ping/internal/hostapi"
 	"cpa-plugin-codex-selective-ping/internal/runstate"
 )
-
 
 func nextSlotLabel(next interface{}, times []string, timezone string) string {
 	hhmm := ""
@@ -42,7 +40,6 @@ func nextSlotLabel(next interface{}, times []string, timezone string) string {
 			return hhmm
 		}
 	}
-	// still highlight matching HH:MM even if not exact list membership after edits
 	return hhmm
 }
 
@@ -56,8 +53,57 @@ func loadLoc(timezone string) *time.Location {
 	return time.Local
 }
 
+func lookupAccountTimes(m map[string][]string, a runstate.AccountView) ([]string, bool) {
+	if len(m) == 0 {
+		return nil, false
+	}
+	for _, key := range []string{preferID(a), a.AuthIndex, a.Email, a.Name} {
+		if key == "" {
+			continue
+		}
+		if times, ok := m[key]; ok && len(times) > 0 {
+			return times, true
+		}
+	}
+	return nil, false
+}
 
-func renderRunHistoryList(st StatusResponse, t func(string) string) string {
+// rematerializeAccountTimes re-keys custom times under preferID (allowlist id) so Save emits
+// AuthIndex ids rather than alternate YAML/status keys (e.g. email when the card uses AuthIndex).
+func rematerializeAccountTimes(accounts []runstate.AccountView, m map[string][]string) map[string][]string {
+	out := map[string][]string{}
+	if len(m) == 0 {
+		return out
+	}
+	for _, a := range accounts {
+		times, ok := lookupAccountTimes(m, a)
+		if !ok {
+			continue
+		}
+		id := preferID(a)
+		if id == "" {
+			continue
+		}
+		out[id] = append([]string(nil), times...)
+	}
+	return out
+}
+
+func modeLabel(lang Lang, mode string) string {
+	switch strings.ToLower(strings.TrimSpace(mode)) {
+	case "force", "manual":
+		return T(lang, "mode_force")
+	case "scheduled", "schedule":
+		return T(lang, "mode_scheduled")
+	default:
+		if mode == "" {
+			return "—"
+		}
+		return mode
+	}
+}
+
+func renderRunHistoryList(st StatusResponse, lang Lang, t func(string) string) string {
 	runs := st.RunHistory
 	if len(runs) == 0 && st.LastRun != nil {
 		runs = []runstate.Summary{*st.LastRun}
@@ -66,19 +112,158 @@ func renderRunHistoryList(st StatusResponse, t func(string) string) string {
 		return ""
 	}
 	var b strings.Builder
-	b.WriteString(`<div class="run-history" data-testid="run-history">`)
-	b.WriteString(`<h3 data-i18n="run_history">` + html.EscapeString(t("run_history")) + `</h3>`)
-	b.WriteString(`<p class="sub" data-i18n="run_history_sub">` + html.EscapeString(t("run_history_sub")) + `</p>`)
-	b.WriteString(`<div class="run-history-list">`)
-	for _, r := range runs {
-		meta := fmt.Sprintf("%s · %s · ok %d · fail %d · skip %d",
-			html.EscapeString(r.Mode),
+	b.WriteString(`<div class="hist" data-testid="run-history">`)
+	for i, r := range runs {
+		openClass := ""
+		chipText := t("hist_expand")
+		if i == 0 {
+			openClass = " open"
+			chipText = t("hist_collapse")
+		}
+		title := fmt.Sprintf("%s · %d %s · %d %s",
+			html.EscapeString(modeLabel(lang, r.Mode)),
+			r.Succeeded, html.EscapeString(t("chip_ok")),
+			r.Skipped, html.EscapeString(t("chip_skipped")))
+		if r.Failed > 0 {
+			title += fmt.Sprintf(" · %d %s", r.Failed, html.EscapeString(t("chip_failed")))
+		}
+		if r.Limited > 0 {
+			title += fmt.Sprintf(" · %d %s", r.Limited, html.EscapeString(t("chip_limited")))
+		}
+		subline := fmt.Sprintf("%s · mode=%s",
 			html.EscapeString(r.At.Format("2006-01-02 15:04")),
-			r.Succeeded, r.Failed, r.Skipped)
-		fmt.Fprintf(&b, `<div class="run-history-item"><div class="meta">%s</div></div>`, meta)
+			html.EscapeString(r.Mode))
+		fmt.Fprintf(&b, `<div class="hist-item%s">`, openClass)
+		fmt.Fprintf(&b, `<button class="hist-head" type="button" onclick="toggleHist(this)">`)
+		fmt.Fprintf(&b, `<div class="left"><div class="title">%s</div><div class="subline">%s</div></div>`, title, subline)
+		fmt.Fprintf(&b, `<span class="chip" data-hist-chip>%s</span></button>`, html.EscapeString(chipText))
+		b.WriteString(`<div class="hist-body" data-testid="hist-accounts">`)
+		if len(r.Accounts) == 0 {
+			b.WriteString(`<div class="hint">—</div>`)
+		}
+		for _, a := range r.Accounts {
+			who := a.Name
+			if who == "" {
+				who = a.Email
+			}
+			if who == "" {
+				who = a.AuthIndex
+			}
+			detail := fmt.Sprintf("%s · %s %d", html.EscapeString(statusLabel(lang, a.Status)), html.EscapeString(t("hist_attempts")), a.Attempts)
+			if a.Error != "" {
+				detail += " · " + html.EscapeString(a.Error)
+			}
+			fmt.Fprintf(&b, `<div class="acct-line"><div><div class="who">%s</div><div class="detail">%s</div></div><span class="chip %s">%s</span></div>`,
+				html.EscapeString(who), detail, statusChipClass(a.Status), html.EscapeString(statusLabel(lang, a.Status)))
+		}
+		b.WriteString(`</div></div>`)
 	}
-	b.WriteString(`</div></div>`)
+	b.WriteString(`</div>`)
 	return b.String()
+}
+
+func renderAccountCards(st StatusResponse, lang Lang, t func(string) string) (rows string, customN int) {
+	var b strings.Builder
+	for _, a := range st.Accounts {
+		checked := ""
+		cardClass := "acct-card"
+		if a.Selected {
+			checked = " checked"
+			cardClass = "acct-card selected"
+		}
+		customTimes, isCustom := lookupAccountTimes(st.AccountTimes, a)
+		sched := "inherit"
+		if isCustom {
+			sched = "custom"
+			customN++
+		}
+		statusChip := statusChipClass(a.Status)
+		statusText := orDash(a.Status)
+		if !a.Selected {
+			statusText = t("chip_unselected")
+			statusChip = ""
+		} else if a.Status == "success" || a.Status == "ok" {
+			statusText = t("status_success")
+			statusChip = "ok"
+		}
+		// Empty Status stays neutral "—" via orDash / empty chip class (not success).
+		metaParts := []string{}
+		if a.AuthIndex != "" {
+			metaParts = append(metaParts, html.EscapeString(t("auth_index_label"))+": "+html.EscapeString(a.AuthIndex))
+		}
+		if a.Email != "" {
+			metaParts = append(metaParts, html.EscapeString(a.Email))
+		}
+		if a.Plan != "" {
+			metaParts = append(metaParts, "plan "+html.EscapeString(a.Plan))
+		}
+		meta := strings.Join(metaParts, " · ")
+		id := preferID(a)
+		displayName := a.Email
+		if displayName == "" {
+			displayName = a.Name
+		}
+		if displayName == "" {
+			displayName = id
+		}
+
+		fmt.Fprintf(&b, `<div class="%s" data-testid="account-schedule" data-sched="%s" data-auth-index="%s" data-email="%s" data-name="%s" data-id="%s" data-selected="%t" data-custom="%t">
+<div class="acct-top">
+<input type="checkbox" class="acct" data-id="%s"%s onchange="syncAcctCard(this)">
+<div><div class="name">%s</div><div class="meta">%s</div></div>
+<span class="chip %s" data-col="status">%s</span>
+</div>`,
+			cardClass, sched,
+			html.EscapeString(a.AuthIndex), html.EscapeString(a.Email), html.EscapeString(a.Name), html.EscapeString(id),
+			a.Selected, isCustom,
+			html.EscapeString(id), checked,
+			html.EscapeString(displayName), meta,
+			statusChip, html.EscapeString(statusText),
+		)
+		// light plan chip (optional)
+		if a.Plan != "" {
+			fmt.Fprintf(&b, `<div class="sched-row"><span class="chip" data-col="plan">%s</span></div>`, html.EscapeString(a.Plan))
+		} else {
+			b.WriteString(`<div class="sched-row hide-plan"><span class="chip" data-col="plan" style="display:none">—</span></div>`)
+		}
+
+		b.WriteString(`<div class="sched-row">`)
+		if !a.Selected {
+			fmt.Fprintf(&b, `<span class="hint">%s</span>`, html.EscapeString(t("sched_not_selected")))
+		} else {
+			inhOn, cusOn := "on", ""
+			if isCustom {
+				inhOn, cusOn = "", "on"
+			}
+			fmt.Fprintf(&b, `<div class="seg" role="group" aria-label="schedule">`+
+				`<button type="button" class="%s" data-sched-btn="inherit" onclick="setAcctSched(this,'inherit')">%s</button>`+
+				`<button type="button" class="%s" data-sched-btn="custom" onclick="setAcctSched(this,'custom')">%s</button></div>`,
+				inhOn, html.EscapeString(t("sched_inherit")),
+				cusOn, html.EscapeString(t("sched_custom")))
+			if isCustom {
+				b.WriteString(`<div class="mini-times" data-mini-times>`)
+				for _, tm := range customTimes {
+					fmt.Fprintf(&b, `<span class="pill" data-tm="%s">%s<button type="button" aria-label="remove" onclick="removeAcctTime(this,'%s')">×</button></span>`,
+						html.EscapeString(tm), html.EscapeString(tm), html.EscapeString(tm))
+				}
+				fmt.Fprintf(&b, `<input type="time" class="acct-new-time" value="12:00" style="width:auto;padding:4px 8px"/>`+
+					`<button class="btn-secondary" type="button" style="padding:6px 10px" onclick="addAcctTime(this)" data-i18n="sched_add">%s</button></div>`,
+					html.EscapeString(t("sched_add")))
+				if len(customTimes) == 0 {
+					fmt.Fprintf(&b, `<span class="hint" data-testid="custom-empty-hint">%s</span>`, html.EscapeString(t("sched_custom_empty")))
+				}
+			} else {
+				eff := strings.Join(st.Times, " · ")
+				if eff == "" {
+					eff = "—"
+				}
+				fmt.Fprintf(&b, `<span class="hint" data-effective>%s %s</span>`,
+					html.EscapeString(t("sched_effective")), html.EscapeString(eff))
+			}
+		}
+		b.WriteString(`</div></div>`)
+	}
+	return b.String(), customN
 }
 
 func RenderStatusPage(st StatusResponse, lang Lang) string {
@@ -115,100 +300,82 @@ func RenderStatusPage(st StatusResponse, lang Lang) string {
 	if nextSlot != "" {
 		railNext = nextSlot
 	}
+	nextInGlobal := false
+	for _, tm := range st.Times {
+		if tm == nextSlot {
+			nextInGlobal = true
+			break
+		}
+	}
+	customNextNote := ""
+	if nextSlot != "" && !nextInGlobal {
+		customNextNote = fmt.Sprintf(`<p class="hint" data-testid="next-custom-only">%s</p>`,
+			html.EscapeString(fmt.Sprintf(t("next_custom_only"), nextSlot)))
+	}
 	nowHHMM := time.Now().In(loadLoc(st.Timezone)).Format("15:04")
 	var timeline strings.Builder
 	for _, tm := range st.Times {
 		slotClass, captionKey := rhythmSlot(tm, nextSlot, nowHHMM)
 		caption := ""
-		if captionKey != "" {
+		if captionKey == "slot_next" {
+			caption = t("slot_next_inherit")
+		} else if captionKey != "" {
 			caption = t(captionKey)
 		}
 		fmt.Fprintf(&timeline, `<div class="%s" data-time="%s"><button class="x" type="button" aria-label="remove" onclick="removeTime('%s')">×</button><div class="t">%s</div><div class="caption">%s</div></div>`,
 			slotClass, html.EscapeString(tm), html.EscapeString(tm), html.EscapeString(tm), html.EscapeString(caption))
 	}
 	selectedN := 0
-	abnormalN := 0
 	for _, a := range st.Accounts {
 		if a.Selected {
 			selectedN++
 		}
-		if accountAbnormal(a) {
-			abnormalN++
-		}
 	}
-	var rows strings.Builder
-	for _, a := range st.Accounts {
-		checked := ""
-		cardClass := "acct-card"
-		if a.Selected {
-			checked = " checked"
-			cardClass = "acct-card selected"
-		}
-		statusChip := statusChipClass(a.Status)
-		metaParts := []string{}
-		if a.Email != "" {
-			metaParts = append(metaParts, html.EscapeString(a.Email))
-		}
-		metaParts = append(metaParts, html.EscapeString(t("auth_index_label"))+": "+html.EscapeString(a.AuthIndex))
-		meta := strings.Join(metaParts, " · ")
-		fmt.Fprintf(&rows, `<div class="%s" data-auth-index="%s" data-name="%s" data-selected="%t" data-abnormal="%t">
-<input type="checkbox" class="acct" data-id="%s"%s onchange="syncAcctCard(this)">
-<div><div class="name">%s</div><div class="meta">%s</div></div>
-<div class="hide-sm"><span class="chip" data-col="plan">%s</span></div>
-<div class="hide-sm"><div class="quota-label" data-i18n="col_5h">%s</div><div class="quota" data-col="five_hour">%s</div>%s</div>
-<div class="hide-sm"><div class="quota-label" data-i18n="col_weekly">%s</div><div class="quota" data-col="weekly">%s</div>%s</div>
-<span class="chip %s" data-col="status">%s</span>
-</div>`,
-			cardClass,
-			html.EscapeString(a.AuthIndex), html.EscapeString(a.Name), a.Selected, accountAbnormal(a),
-			html.EscapeString(preferID(a)), checked,
-			html.EscapeString(a.Name), meta,
-			dash(a.Plan),
-			html.EscapeString(t("col_5h")), formatWindow(a.FiveHour, lang), quotaBarHTML(a.FiveHour),
-			html.EscapeString(t("col_weekly")), formatWindow(a.Weekly, lang), quotaBarHTML(a.Weekly),
-			statusChip, html.EscapeString(orDash(a.Status)),
-		)
-	}
+	rows, customN := renderAccountCards(st, lang, t)
 	accountsEmptyClass := ""
-	if selectedN > 0 {
+	accountsFilledClass := ""
+	if len(st.Accounts) == 0 {
+		accountsFilledClass = " hidden"
+		accountsEmptyClass = ""
+	} else {
 		accountsEmptyClass = " hidden"
 	}
 	lastFilledClass := " hidden"
 	lastEmptyClass := ""
 	lastBlock := ""
-	if st.LastRun != nil {
+	if st.LastRun != nil || len(st.RunHistory) > 0 {
 		lastFilledClass = ""
 		lastEmptyClass = " hidden"
 		lr := st.LastRun
-		var lrRows strings.Builder
-		for _, a := range lr.Accounts {
-			meta := fmt.Sprintf("HTTP %d", a.HTTPStatus)
-			if a.Error != "" {
-				meta = html.EscapeString(a.Error)
-				if a.HTTPStatus > 0 {
-					meta = fmt.Sprintf("%d · %s", a.HTTPStatus, html.EscapeString(a.Error))
-				}
-			} else if a.HTTPStatus == 0 {
-				meta = "—"
+		if lr == nil && len(st.RunHistory) > 0 {
+			lr = &st.RunHistory[0]
+		}
+		big := "—"
+		metaLine := ""
+		if lr != nil {
+			big = fmt.Sprintf("%d %s", lr.Succeeded, t("chip_ok"))
+			metaLine = fmt.Sprintf("%s · %s · %s %d · %s %d",
+				html.EscapeString(lr.Mode),
+				html.EscapeString(lr.At.Format("15:04")),
+				html.EscapeString(t("chip_failed")), lr.Failed,
+				html.EscapeString(t("chip_skipped")), lr.Skipped)
+			if lr.Limited > 0 {
+				metaLine += fmt.Sprintf(" · %s %d", html.EscapeString(t("chip_limited")), lr.Limited)
 			}
-			fmt.Fprintf(&lrRows, `<div class="run-item"><div><div class="name" style="font-weight:750">%s</div><div class="meta">%s</div></div><span class="chip %s">%s</span></div>`,
-				html.EscapeString(a.Name), meta, statusChipClass(a.Status), html.EscapeString(statusLabel(lang, a.Status)))
 		}
-		big := fmt.Sprintf("%d %s", lr.Succeeded, t("chip_ok"))
-		metaLine := fmt.Sprintf("%s: %s · %s<br/>%s %d · %s %d", html.EscapeString(t("chip_mode")), html.EscapeString(lr.Mode), html.EscapeString(lr.At.Format("15:04")), html.EscapeString(t("chip_limited")), lr.Limited, html.EscapeString(t("chip_skipped")), lr.Skipped)
-		if lr.Failed > 0 {
-			metaLine += fmt.Sprintf(" · %s %d", html.EscapeString(t("chip_failed")), lr.Failed)
-		}
-		lastBlock = fmt.Sprintf(`<div class="run"><div class="run-summary"><div class="label" data-i18n="last_run_receipt_label">%s</div><div class="big">%s</div><div class="meta">%s</div></div><div class="run-list">%s</div></div>`,
-			html.EscapeString(t("last_run_receipt_label")), html.EscapeString(big), metaLine, lrRows.String())
-		if lr.Message != "" {
+		hist := renderRunHistoryList(st, lang, t)
+		lastBlock = fmt.Sprintf(`<div class="run"><div class="run-summary"><div class="label" data-i18n="last_run_receipt_label">%s</div><div class="big">%s</div><div class="meta">%s</div></div>%s</div>`,
+			html.EscapeString(t("last_run_receipt_label")), html.EscapeString(big), metaLine, hist)
+		if lr != nil && lr.Message != "" {
 			lastBlock += `<p class="hint">` + html.EscapeString(lr.Message) + `</p>`
 		}
 	}
-	if hist := renderRunHistoryList(st, t); hist != "" && lastBlock != "" {
-		lastBlock += hist
-	}
 	timesJSON, _ := json.Marshal(st.Times)
+	seededAccountTimes := rematerializeAccountTimes(st.Accounts, st.AccountTimes)
+	accountTimesJSON, _ := json.Marshal(seededAccountTimes)
+	if len(seededAccountTimes) == 0 {
+		accountTimesJSON = []byte("{}")
+	}
 	banner := fmt.Sprintf(t("banner_selected"), selectedN, len(st.Accounts))
 	if len(st.AccountsConfig) == 0 {
 		banner = t("banner_empty")
@@ -316,11 +483,11 @@ func RenderStatusPage(st StatusResponse, lang Lang) string {
   .field { display:grid; gap:6px; font-size:12px; color: var(--ink-soft); font-weight: 650 }
   input[type=text], input[type=password], input[type=time] {
     border: 1px solid var(--line); background: var(--bg);
-    border-radius: 11px; padding: 10px 11px; color: var(--ink); font: inherit;
+    border-radius: 11px; padding: 10px 11px; color: var(--ink); font: inherit; width: 100%%;
   }
   .workspace { display:grid; gap: 16px }
   .hero {
-    display:grid; grid-template-columns: 1.3fr .7fr; gap: 14px;
+    display:grid; grid-template-columns: 1.35fr .65fr; gap: 14px;
   }
   @media (max-width: 960px) { .hero { grid-template-columns: 1fr } }
   .panel {
@@ -369,33 +536,28 @@ func RenderStatusPage(st StatusResponse, lang Lang) string {
     border-radius: 999px; padding: 6px 11px; font-size: 12px; font-weight: 700;
   }
   .tab.on { background: var(--ink); color: var(--panel); border-color: var(--ink) }
-  .account-grid { display:grid; gap: 10px }
+  .account-grid { display:grid; gap: 12px }
   .acct-card {
-    display:grid;
-    grid-template-columns: 28px 1.4fr .7fr .8fr .8fr auto;
-    gap: 10px; align-items: center;
-    padding: 12px 14px;
-    border-radius: 16px;
+    display:grid; gap: 12px;
+    padding: 14px 16px;
+    border-radius: 18px;
     border: 1px solid var(--line);
     background: var(--bg);
-  }
-  @media (max-width: 900px) {
-    .acct-card { grid-template-columns: 28px 1fr; }
-    .acct-card .hide-sm { display:none }
   }
   .acct-card.selected {
     background: color-mix(in srgb, var(--accent-2) 10%%, var(--panel));
     border-color: color-mix(in srgb, var(--accent-2) 45%%, var(--line));
   }
+  .acct-top { display:grid; grid-template-columns: 28px 1fr auto; gap: 10px; align-items: center }
   .acct-card .name { font-weight: 750; font-size: 14px }
   .acct-card .meta { color: var(--ink-soft); font-size: 11px; margin-top: 2px; font-family: var(--mono) }
-  .bar {
-    height: 7px; border-radius: 99px; background: var(--chip); overflow: hidden; margin-top: 5px;
-  }
-  .bar > span { display:block; height:100%%; background: var(--accent-2) }
-  .bar.warn > span { background: var(--warn) }
-  .bar.bad > span { background: var(--bad) }
-  .quota-label { font-size: 11px; color: var(--ink-soft); font-variant-numeric: tabular-nums }
+  .sched-row { display:flex; flex-wrap:wrap; gap:10px; align-items:center; padding-top:4px; border-top:1px dashed var(--line) }
+  .seg { display:inline-flex; border:1px solid var(--line); border-radius:999px; overflow:hidden; background:var(--panel) }
+  .seg button { border:0; background:transparent; padding:6px 12px; font-size:12px; font-weight:700; color:var(--ink-soft); border-radius:0 }
+  .seg button.on { background:var(--ink); color:var(--panel) }
+  .mini-times { display:flex; flex-wrap:wrap; gap:6px; align-items:center }
+  .mini-times .pill { font-family:var(--mono); font-size:12px; font-weight:700; padding:4px 8px; border-radius:999px; background:var(--panel-2); border:1px solid var(--line) }
+  .mini-times .pill button { border:0; background:transparent; color:var(--ink-soft); margin-left:4px; cursor:pointer; padding:0; font-size:12px }
   .chip {
     display:inline-flex; align-items:center; padding: 4px 9px; border-radius: 999px;
     font-size: 11px; font-weight: 750;
@@ -405,7 +567,7 @@ func RenderStatusPage(st StatusResponse, lang Lang) string {
   .chip.warn { background: var(--warn-bg); color: var(--warn) }
   .chip.bad { background: var(--bad-bg); color: var(--bad) }
   .run {
-    display:grid; grid-template-columns: 160px 1fr; gap: 14px;
+    display:grid; grid-template-columns: 170px 1fr; gap: 14px;
   }
   @media (max-width: 800px) { .run { grid-template-columns: 1fr } }
   .run-summary {
@@ -414,14 +576,21 @@ func RenderStatusPage(st StatusResponse, lang Lang) string {
   }
   .run-summary .label { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; opacity: .7 }
   .run-summary .big {
-    font-family: var(--sans); font-size: 34px; margin: 8px 0 4px; letter-spacing: -.03em;
+    font-family: var(--sans); font-size: 30px; margin: 8px 0 4px; letter-spacing: -.03em;
   }
   .run-summary .meta { font-size: 12px; opacity: .75; font-family: var(--mono) }
-  .run-list { display:grid; gap: 8px }
-  .run-item {
-    display:flex; justify-content:space-between; gap:10px; align-items:center;
-    padding: 10px 12px; border-radius: 14px; border: 1px solid var(--line); background: var(--bg);
-  }
+  .hist { display:grid; gap: 8px }
+  .hist-item { border:1px solid var(--line); border-radius:14px; background:var(--bg); overflow:hidden }
+  .hist-head { display:flex; justify-content:space-between; gap:10px; align-items:center; padding:10px 12px; cursor:pointer; width:100%%; border:0; background:transparent; color:inherit; text-align:left; font:inherit }
+  .hist-head:hover { background: color-mix(in srgb, var(--accent) 6%%, transparent) }
+  .hist-head .left { display:grid; gap:2px }
+  .hist-head .title { font-weight:750; font-size:13px }
+  .hist-head .subline { font-size:11px; color:var(--ink-soft); font-family:var(--mono) }
+  .hist-body { display:none; padding:0 12px 12px; border-top:1px dashed var(--line) }
+  .hist-item.open .hist-body { display:grid; gap:6px; padding-top:10px }
+  .acct-line { display:flex; justify-content:space-between; gap:8px; align-items:center; padding:8px 10px; border-radius:12px; background:var(--panel); border:1px solid var(--line); font-size:12px }
+  .acct-line .who { font-weight:700 }
+  .acct-line .detail { color:var(--ink-soft); font-family:var(--mono); font-size:11px }
   .empty {
     border: 1.5px dashed var(--line);
     border-radius: 18px; padding: 22px 18px; background: var(--bg-2);
@@ -436,11 +605,10 @@ func RenderStatusPage(st StatusResponse, lang Lang) string {
   .lang-switch a.active,.lang-switch a:hover{background:var(--ink);color:var(--panel);border-color:var(--ink)}
   .banner{background:color-mix(in srgb, var(--warn) 14%%, var(--panel));border:1px solid var(--line);color:var(--warn);border-radius:12px;padding:10px 12px;font-size:13px;margin:8px 0 12px}
   pre{white-space:pre-wrap;background:var(--bg-2);padding:12px;border-radius:12px;font-size:12px;max-height:160px;overflow:auto}
-  .hint{font-size:12px;color:var(--ink-soft);margin-top:8px}
+  .hint{font-size:11px;color:var(--ink-soft)}
   @media (prefers-reduced-motion: reduce) {
     * { transition: none !important; animation: none !important }
   }
-
 </style>
 </head>
 <body>
@@ -479,8 +647,9 @@ func RenderStatusPage(st StatusResponse, lang Lang) string {
 <section class="hero">
 <section class="panel" id="sec-rhythm">
 <h2 data-i18n="rhythm_title">%s</h2>
-<p class="sub" data-i18n="schedule_hint">%s</p>
+<p class="sub" data-i18n="rhythm_sub">%s</p>
 <div class="timeline" id="times">%s</div>
+%s
 <div class="add-row">
   <label class="field" data-i18n="timezone">%s<input id="tz" type="text" value="%s"/></label>
   <label class="field" data-i18n="add_time">%s<input id="new-time" type="time" value="21:00"/></label>
@@ -491,23 +660,24 @@ func RenderStatusPage(st StatusResponse, lang Lang) string {
 </div>
 </section>
 <section class="panel" id="sec-principles" style="background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 16%%, var(--panel)), var(--panel));">
-<h2 data-i18n="principles_title">%s</h2>
-<p class="sub" data-i18n="principles_body">%s</p>
+<h2 data-i18n="how_title">%s</h2>
+<p class="sub" data-i18n="how_body">%s</p>
+<div class="metric"><span class="k" data-i18n="how_global_off">%s</span><span class="v" data-i18n="how_global_off_v">%s</span></div>
+<div class="metric"><span class="k" data-i18n="how_manual">%s</span><span class="v" data-i18n="how_manual_v">%s</span></div>
+<div class="metric"><span class="k" data-i18n="how_quota_removed">%s</span><span class="v" data-i18n="how_quota_removed_v">%s</span></div>
 <div class="metric"><span class="k" data-i18n="status">%s</span><span class="v"><span class="chip %s">%s</span></span></div>
-<div class="metric"><span class="k" data-i18n="col_5h">%s</span><span class="v" data-i18n="principles_quota">%s</span></div>
-<div class="metric"><span class="k" data-i18n="last_run">%s</span><span class="v" data-i18n="principles_persist">%s</span></div>
 </section>
 </section>
-<section class="panel" id="sec-accounts-filled">
+<section class="panel%s" id="sec-accounts-filled">
 <div class="accounts-head">
   <div>
     <h2 data-i18n="accounts_who_title">%s</h2>
-    <p class="sub" data-i18n="accounts_hint" style="margin:0">%s</p>
+    <p class="sub" data-i18n="accounts_times_sub" style="margin:0">%s</p>
   </div>
   <div class="tabs">
     <button class="tab on" type="button" data-filter="all" onclick="filterAccounts('all')" data-i18n="filter_all">%s</button>
     <button class="tab" type="button" data-filter="selected" onclick="filterAccounts('selected')" data-i18n="filter_selected">%s</button>
-    <button class="tab" type="button" data-filter="abnormal" onclick="filterAccounts('abnormal')" data-i18n="filter_abnormal">%s</button>
+    <button class="tab" type="button" data-filter="custom" onclick="filterAccounts('custom')" data-i18n="filter_custom">%s</button>
   </div>
 </div>
 <div class="row" style="margin:0 0 12px;gap:8px">
@@ -518,20 +688,20 @@ func RenderStatusPage(st StatusResponse, lang Lang) string {
 <div class="account-grid" id="account-grid">%s</div>
 </section>
 <section class="panel%s" id="sec-accounts-empty">
-  <h2 data-i18n="accounts_empty_heading">%s</h2>
+  <h2 data-i18n="accounts_none_title">%s</h2>
   <div class="empty">
     <strong data-i18n="accounts_empty_title">%s</strong>
-    <p data-i18n="accounts_empty_body">%s</p>
-    <button class="btn-primary" type="button" onclick="document.getElementById('sec-accounts-filled')?.scrollIntoView({behavior:'smooth'})" data-i18n="accounts_empty_cta">%s</button>
+    <p data-i18n="accounts_none_body">%s</p>
+    <button class="btn-primary" type="button" onclick="location.reload()" data-i18n="accounts_none_cta">%s</button>
   </div>
 </section>
 <section class="panel%s" id="sec-last-filled">
-<h2 data-i18n="last_run">%s</h2>
-<p class="sub" data-i18n="last_run_sub">%s</p>
+<h2 data-i18n="run_history_title">%s</h2>
+<p class="sub" data-i18n="run_history_sub">%s</p>
 %s
 </section>
 <section class="panel%s" id="sec-last-empty">
-<h2 data-i18n="last_run">%s</h2>
+<h2 data-i18n="run_history_title">%s</h2>
 <div class="empty">
 <strong data-i18n="last_run_empty_title">%s</strong>
 <p data-i18n="last_run_empty_body">%s</p>
@@ -542,15 +712,56 @@ func RenderStatusPage(st StatusResponse, lang Lang) string {
 </div>
 <script>
 const initialTimes = %s;
+const initialAccountTimes = %s;
 const nextSlotHint = %q;
 const slotCaptionNext = %q;
 const slotCaptionPast = %q;
+const labelSchedEffective = %q;
+const labelSchedNotSelected = %q;
+const labelSchedInherit = %q;
+const labelSchedCustom = %q;
+const labelSchedCustomEmpty = %q;
+const labelHistExpand = %q;
+const labelHistCollapse = %q;
 const pluginId = "codex-selective-ping";
 const serverLang = %q;
 const msgNeedKey = %q;
 const msgSaving = %q;
 const msgStarting = %q;
 let times = Array.isArray(initialTimes) ? initialTimes.slice() : [];
+let accountTimes = (initialAccountTimes && typeof initialAccountTimes === 'object') ? JSON.parse(JSON.stringify(initialAccountTimes)) : {};
+let accountSched = {};
+function rematerializeAccountTimesFromCards(){
+  document.querySelectorAll('#account-grid > [data-testid="account-schedule"]').forEach(function(card){
+    const id = card.getAttribute('data-id');
+    if(!id) return;
+    accountSched[id] = card.getAttribute('data-sched') || 'inherit';
+    const keys = [id, card.getAttribute('data-auth-index'), card.getAttribute('data-email'), card.getAttribute('data-name')].filter(Boolean);
+    let found = null;
+    for (let i=0;i<keys.length;i++){
+      const k = keys[i];
+      if(accountTimes[k] && accountTimes[k].length){ found = accountTimes[k].slice(); break; }
+    }
+    if(!found || !found.length){
+      const pills = Array.from(card.querySelectorAll('[data-tm]')).map(function(p){ return p.getAttribute('data-tm'); }).filter(Boolean);
+      if(pills.length) found = pills;
+    }
+    keys.forEach(function(k){ if(k !== id) delete accountTimes[k]; });
+    if(accountSched[id] === 'custom'){
+      accountTimes[id] = found ? found.slice() : (accountTimes[id] || []);
+    } else {
+      delete accountTimes[id];
+    }
+  });
+  // Drop any leftover alternate keys not matching a card data-id.
+  const allow = {};
+  document.querySelectorAll('#account-grid > [data-testid="account-schedule"]').forEach(function(card){
+    const id = card.getAttribute('data-id');
+    if(id) allow[id] = true;
+  });
+  Object.keys(accountTimes).forEach(function(k){ if(!allow[k]) delete accountTimes[k]; });
+}
+rematerializeAccountTimesFromCards();
 
 function normalizeCPALang(raw){
   if(!raw) return '';
@@ -567,14 +778,13 @@ function normalizeCPALang(raw){
   if(['zh-tw','zh-hant','zh-hk','zh-mo','zh_tw','zh_hant','zh_hk','zh_mo'].indexOf(lower)>=0) return 'zh-Hant';
   if(lower === 'en' || lower.indexOf('en-')===0 || lower.indexOf('en_')===0) return 'en';
   if(lower === 'ja' || lower.indexOf('ja-')===0 || lower.indexOf('ja_')===0) return 'ja';
-  // zh-CN / ru / anything else → zh-Hant
   return 'zh-Hant';
 }
 
 (function alignCPALanguage(){
   try{
     const params = new URLSearchParams(location.search);
-    if(params.has('lang')) return; // explicit override; do not write CPA localStorage
+    if(params.has('lang')) return;
     const raw = localStorage.getItem('cli-proxy-language');
     if(raw == null || raw === '') return;
     const mapped = normalizeCPALang(raw);
@@ -687,6 +897,9 @@ function renderTimes(){
     c.textContent = isNext ? slotCaptionNext : (isPast ? slotCaptionPast : '');
     d.appendChild(x); d.appendChild(tEl); d.appendChild(c); el.appendChild(d);
   });
+  document.querySelectorAll('[data-effective]').forEach(function(h){
+    h.textContent = labelSchedEffective + ' ' + (times.length ? times.join(' · ') : '—');
+  });
 }
 function removeTime(tm){
   const i = times.indexOf(tm);
@@ -702,47 +915,192 @@ function addTime(){
 let acctFilter='all';
 function setAll(v){
   document.querySelectorAll('input.acct').forEach(c=>{ c.checked=v; syncAcctCard(c, true); });
-  const empty=document.getElementById('sec-accounts-empty');
-  if(empty){ empty.classList.toggle('hidden', !!v && document.querySelectorAll('input.acct:checked').length>0); }
   filterAccounts(acctFilter);
 }
 function syncAcctCard(cb, skipFilter){
-  const card=cb.closest('.acct-card[data-auth-index],div[data-auth-index]');
+  const card=cb.closest('.acct-card[data-auth-index],div[data-testid="account-schedule"]');
   if(!card) return;
   card.classList.toggle('selected', cb.checked);
   card.setAttribute('data-selected', cb.checked ? 'true' : 'false');
-  const empty=document.getElementById('sec-accounts-empty');
-  if(empty){
-    const n=document.querySelectorAll('input.acct:checked').length;
-    empty.classList.toggle('hidden', n>0);
-  }
+  rebuildAcctSchedRow(card, cb.checked);
   if(!skipFilter) filterAccounts(acctFilter);
+}
+function rebuildAcctSchedRow(card, selected){
+  const id=cardId(card);
+  let row=card.querySelector('.sched-row:last-of-type');
+  if(!row) return;
+  row.innerHTML='';
+  if(!selected){
+    const hint=document.createElement('span');
+    hint.className='hint';
+    hint.textContent=labelSchedNotSelected;
+    row.appendChild(hint);
+    return;
+  }
+  const mode=accountSched[id]||'inherit';
+  const seg=document.createElement('div');
+  seg.className='seg';
+  seg.setAttribute('role','group');
+  seg.setAttribute('aria-label','schedule');
+  ['inherit','custom'].forEach(function(m){
+    const b=document.createElement('button');
+    b.type='button';
+    b.setAttribute('data-sched-btn', m);
+    if(m===mode) b.className='on';
+    b.textContent = m==='inherit' ? labelSchedInherit : labelSchedCustom;
+    b.onclick=function(){ setAcctSched(b, m); };
+    seg.appendChild(b);
+  });
+  row.appendChild(seg);
+  if(mode==='inherit'){
+    delete accountTimes[id];
+    const hint=document.createElement('span');
+    hint.className='hint';
+    hint.setAttribute('data-effective','');
+    hint.textContent=labelSchedEffective+' '+(times.length?times.join(' · '):'—');
+    row.appendChild(hint);
+  } else {
+    if(!accountTimes[id]) accountTimes[id]=[];
+    renderMiniTimes(card, row);
+    if(!(accountTimes[id]&&accountTimes[id].length)){
+      const eh=document.createElement('span');
+      eh.className='hint';
+      eh.setAttribute('data-testid','custom-empty-hint');
+      eh.textContent=labelSchedCustomEmpty;
+      row.appendChild(eh);
+    }
+  }
+}
+function toggleHist(btn){
+  const item=btn.parentElement;
+  if(!item) return;
+  item.classList.toggle('open');
+  const chip=btn.querySelector('[data-hist-chip],.chip');
+  if(chip) chip.textContent = item.classList.contains('open') ? labelHistCollapse : labelHistExpand;
 }
 function filterAccounts(mode){
   if(mode) acctFilter=mode;
   document.querySelectorAll('.tabs .tab').forEach(t=>t.classList.toggle('on', t.getAttribute('data-filter')===acctFilter));
-  document.querySelectorAll('#account-grid > [data-auth-index]').forEach(card=>{
+  document.querySelectorAll('#account-grid > [data-testid="account-schedule"]').forEach(card=>{
     const sel=card.getAttribute('data-selected')==='true';
-    const abn=card.getAttribute('data-abnormal')==='true';
+    const custom=card.getAttribute('data-custom')==='true' || card.getAttribute('data-sched')==='custom';
     let show=true;
     if(acctFilter==='selected') show=sel;
-    if(acctFilter==='abnormal') show=abn;
+    if(acctFilter==='custom') show=custom;
     card.style.display = show ? '' : 'none';
   });
 }
+function cardId(card){ return card.getAttribute('data-id') || ''; }
+function setAcctSched(btn, mode){
+  const card=btn.closest('[data-testid="account-schedule"]');
+  if(!card) return;
+  const id=cardId(card);
+  accountSched[id]=mode;
+  card.setAttribute('data-sched', mode);
+  card.setAttribute('data-custom', mode==='custom' ? 'true' : 'false');
+  card.querySelectorAll('[data-sched-btn]').forEach(b=>b.classList.toggle('on', b.getAttribute('data-sched-btn')===mode));
+  let row=card.querySelector('.sched-row:last-of-type');
+  if(!row) return;
+  // keep seg; replace trailing content after seg
+  const seg=row.querySelector('.seg');
+  row.innerHTML='';
+  if(seg) row.appendChild(seg);
+  if(mode==='inherit'){
+    delete accountTimes[id];
+    const hint=document.createElement('span');
+    hint.className='hint';
+    hint.setAttribute('data-effective','');
+    hint.textContent=labelSchedEffective+' '+(times.length?times.join(' · '):'—');
+    row.appendChild(hint);
+  } else {
+    if(!accountTimes[id]) accountTimes[id]=[];
+    renderMiniTimes(card, row);
+  }
+  filterAccounts(acctFilter);
+}
+function renderMiniTimes(card, row){
+  const id=cardId(card);
+  let box=row.querySelector('[data-mini-times]');
+  if(!box){
+    box=document.createElement('div');
+    box.className='mini-times';
+    box.setAttribute('data-mini-times','');
+    row.appendChild(box);
+  }
+  box.innerHTML='';
+  (accountTimes[id]||[]).forEach(function(tm){
+    const pill=document.createElement('span');
+    pill.className='pill';
+    pill.setAttribute('data-tm', tm);
+    pill.textContent=tm;
+    const x=document.createElement('button');
+    x.type='button'; x.setAttribute('aria-label','remove'); x.textContent='×';
+    x.onclick=function(){ removeAcctTime(x, tm); };
+    pill.appendChild(x);
+    box.appendChild(pill);
+  });
+  const inp=document.createElement('input');
+  inp.type='time'; inp.className='acct-new-time'; inp.value='12:00';
+  inp.style.width='auto'; inp.style.padding='4px 8px';
+  const add=document.createElement('button');
+  add.type='button'; add.className='btn-secondary'; add.style.padding='6px 10px';
+  add.textContent='+';
+  add.onclick=function(){ addAcctTime(add); };
+  box.appendChild(inp); box.appendChild(add);
+  if(!(accountTimes[id]&&accountTimes[id].length)){
+    const eh=document.createElement('span');
+    eh.className='hint';
+    eh.setAttribute('data-testid','custom-empty-hint');
+    eh.textContent=labelSchedCustomEmpty;
+    row.appendChild(eh);
+  } else {
+    const old=row.querySelector('[data-testid="custom-empty-hint"]');
+    if(old) old.remove();
+  }
+}
+function removeAcctTime(btn, tm){
+  const card=btn.closest('[data-testid="account-schedule"]');
+  if(!card) return;
+  const id=cardId(card);
+  accountTimes[id]=(accountTimes[id]||[]).filter(x=>x!==tm);
+  const row=btn.closest('.sched-row');
+  renderMiniTimes(card, row);
+}
+function addAcctTime(btn){
+  const card=btn.closest('[data-testid="account-schedule"]');
+  if(!card) return;
+  const id=cardId(card);
+  const inp=card.querySelector('.acct-new-time');
+  if(!inp || !inp.value) return;
+  const n=inp.value.slice(0,5);
+  if(!accountTimes[id]) accountTimes[id]=[];
+  if(accountTimes[id].indexOf(n)<0) accountTimes[id].push(n);
+  accountTimes[id].sort();
+  renderMiniTimes(card, btn.closest('.sched-row'));
+}
 function selectedAccounts(){
   return Array.from(document.querySelectorAll('input.acct:checked')).map(c=>c.getAttribute('data-id'));
+}
+function collectAccountTimes(){
+  const out={};
+  selectedAccounts().forEach(function(id){
+    if(accountSched[id]==='custom' && accountTimes[id] && accountTimes[id].length){
+      out[id]=accountTimes[id].slice();
+    }
+  });
+  return out;
 }
 function key(){ return document.getElementById('management-key').value.trim(); }
 async function saveCfg(){
   const o=document.getElementById('result'); const k=key();
   if(!k){ o.textContent=msgNeedKey; return; }
-  const body={schedule_enabled:document.getElementById('schedule_enabled').checked, timezone:document.getElementById('tz').value.trim(), times:times, accounts:selectedAccounts()};
+  const account_times=collectAccountTimes();
+  const body={schedule_enabled:document.getElementById('schedule_enabled').checked, timezone:document.getElementById('tz').value.trim(), times:times, accounts:selectedAccounts(), account_times:account_times};
   o.textContent=msgSaving;
   try{
     const r=await fetch('/v0/management/plugins/codex-selective-ping/config',{method:'PATCH',headers:{'Authorization':'Bearer '+k,'Content-Type':'application/json'},body:JSON.stringify(body)});
     o.textContent=await r.text();
-    if(r.ok){ enrichQuotaFromManagement(); setTimeout(()=>location.reload(),800);} 
+    if(r.ok){ setTimeout(()=>location.reload(),800);}
   }catch(e){ o.textContent=String(e); }
 }
 async function runNow(){
@@ -752,204 +1110,8 @@ async function runNow(){
   try{
     const r=await fetch('/v0/management/plugins/codex-selective-ping/run',{method:'POST',headers:{'Authorization':'Bearer '+k}});
     o.textContent=await r.text();
-    if(r.ok){ enrichQuotaFromManagement(); setTimeout(()=>location.reload(),1500);} 
+    if(r.ok){ setTimeout(()=>location.reload(),1500);}
   }catch(e){ o.textContent=String(e); }
-}
-function fmtQuotaWindow(w){
-  if(!w) return '—';
-  // Keep labels minimal/numeric; server-rendered i18n already covers first paint.
-  let main = '—';
-  if(w.remaining!=null){
-    const n=Number(w.remaining);
-    main = (Number.isFinite(n)? n.toPrecision(4).replace(/\.?0+$/,'') : String(w.remaining));
-  } else if(w.used!=null){
-    const n=Number(w.used);
-    main = 'used '+(Number.isFinite(n)? n.toPrecision(4).replace(/\.?0+$/,'') : String(w.used));
-  }
-  let reset='';
-  if(w.resets_at){
-    try{
-      const d=new Date(w.resets_at);
-      if(!isNaN(d.getTime())){
-        const mm=String(d.getMonth()+1).padStart(2,'0');
-        const dd=String(d.getDate()).padStart(2,'0');
-        const hh=String(d.getHours()).padStart(2,'0');
-        const mi=String(d.getMinutes()).padStart(2,'0');
-        reset='<small>'+mm+'-'+dd+' '+hh+':'+mi+'</small>';
-      }
-    }catch(e){}
-  }
-  if(main==='—' && !reset) return '—';
-  return main+reset;
-}
-function planFromAuthFile(entry){
-  if(!entry||typeof entry!=='object') return '';
-  if(entry.plan) return String(entry.plan);
-  if(entry.plan_type) return String(entry.plan_type);
-  if(entry.planType) return String(entry.planType);
-  const idt=entry.id_token;
-  if(idt && typeof idt==='object'){
-    return String(idt.plan_type||idt.planType||idt.chatgpt_plan_type||'');
-  }
-  return '';
-}
-function windowFromAuthFile(entry, which){
-  if(!entry||typeof entry!=='object') return null;
-  // Prefer explicit five_hour/weekly shapes if CPA ever exposes them.
-  const direct=entry[which]||entry[which=== 'five_hour'?'fiveHour':'weeklyLimit'];
-  if(direct && typeof direct==='object'){
-    const rem=direct.remaining??direct.remaining_fraction??direct.remainingFraction??direct.remaining_percent??direct.remainingPercent;
-    const used=direct.used??direct.used_percent??direct.usedPercent;
-    const resets=direct.resets_at??direct.reset_at??direct.resetsAt??direct.resetAt;
-    if(rem!=null||used!=null||resets!=null){
-      const w={}; if(rem!=null) w.remaining=Number(rem); if(used!=null) w.used=Number(used); if(resets!=null) w.resets_at=resets; return w;
-    }
-  }
-  return null;
-}
-function windowFromWham(usage, which){
-  if(!usage||typeof usage!=='object') return null;
-  const rate=usage.rate_limit||usage.rateLimit||{};
-  let win=null;
-  if(which==='five_hour'){
-    win=rate.primary_window||rate.primaryWindow||null;
-    if(win && Number(win.limit_window_seconds||win.limitWindowSeconds||0) && Number(win.limit_window_seconds||win.limitWindowSeconds)!==18000){
-      // keep; duration matcher below can still use it
-    }
-  } else {
-    win=rate.secondary_window||rate.secondaryWindow||null;
-  }
-  // Duration-based fallback across both windows.
-  const cands=[rate.primary_window||rate.primaryWindow, rate.secondary_window||rate.secondaryWindow].filter(Boolean);
-  if(which==='five_hour'){
-    const byDur=cands.find(w=>Number(w.limit_window_seconds||w.limitWindowSeconds||0)===18000);
-    if(byDur) win=byDur;
-  } else {
-    const byDur=cands.find(w=>{const s=Number(w.limit_window_seconds||w.limitWindowSeconds||0); return s===604800 || (s>=2419200&&s<=2678400);});
-    if(byDur) win=byDur;
-  }
-  if(!win) return null;
-  const used=win.used_percent??win.usedPercent;
-  const rem = used!=null ? (100-Number(used)) : (win.remaining_percent??win.remainingPercent??win.remaining);
-  const resets=win.reset_at??win.resetAt??win.resets_at??win.resetsAt;
-  if(rem==null && used==null && !resets) return null;
-  const out={};
-  if(rem!=null) out.remaining=Number(rem);
-  if(used!=null) out.used=Number(used);
-  if(resets!=null){
-    // unix seconds → ISO
-    const n=Number(resets);
-    out.resets_at = (Number.isFinite(n) && n>1000000000) ? new Date(n*1000).toISOString() : String(resets);
-  }
-  return out;
-}
-function quotaBarClass(rem){
-  if(rem==null || !Number.isFinite(Number(rem))) return '';
-  const n=Number(rem);
-  if(n<=0) return 'bar bad';
-  if(n<50) return 'bar warn';
-  return 'bar';
-}
-function quotaBarWidth(rem){
-  if(rem==null || !Number.isFinite(Number(rem))) return 0;
-  const n=Math.max(0, Math.min(100, Number(rem)));
-  return n<=0 ? 2 : n;
-}
-function renderQuotaBar(parent, w){
-  if(!parent) return;
-  let bar=parent.querySelector('.bar');
-  let rem=null;
-  if(w){
-    if(w.remaining!=null) rem=Number(w.remaining);
-    else if(w.used!=null) rem=100-Number(w.used);
-  }
-  if(rem==null || !Number.isFinite(rem)){
-    if(bar) bar.remove();
-    return;
-  }
-  if(!bar){
-    bar=document.createElement('div');
-    parent.appendChild(bar);
-  }
-  bar.className=quotaBarClass(rem);
-  let span=bar.querySelector('span');
-  if(!span){ span=document.createElement('span'); bar.appendChild(span); }
-  span.style.width=quotaBarWidth(rem)+'%%';
-  parent.removeAttribute('data-bar-width');
-  bar.setAttribute('data-bar-width', String(quotaBarWidth(rem)));
-}
-function applyQuotaToRow(row, plan, five, weekly){
-  if(plan){ const el=row.querySelector('[data-col="plan"]'); if(el) el.textContent=plan; }
-  if(five){
-    const el=row.querySelector('[data-col="five_hour"]');
-    if(el){ el.innerHTML=fmtQuotaWindow(five); renderQuotaBar(el.parentElement, five); }
-  }
-  if(weekly){
-    const el=row.querySelector('[data-col="weekly"]');
-    if(el){ el.innerHTML=fmtQuotaWindow(weekly); renderQuotaBar(el.parentElement, weekly); }
-  }
-}
-async function enrichQuotaFromManagement(){
-  const k=key();
-  if(!k) return;
-  const o=document.getElementById('result');
-  try{
-    const r=await fetch('/v0/management/auth-files',{headers:{'Authorization':'Bearer '+k,'Accept':'application/json'}});
-    if(!r.ok){ if(o) o.textContent='auth-files HTTP '+r.status; return; }
-    const data=await r.json();
-    const files=Array.isArray(data)?data:(data.files||data.items||[]);
-    const byIndex={}; const byName={};
-    files.forEach(f=>{
-      if(!f) return;
-      const idx=String(f.auth_index||f.authIndex||'');
-      const name=String(f.name||'');
-      if(idx) byIndex[idx]=f;
-      if(name) byName[name]=f;
-    });
-    const rows=Array.from(document.querySelectorAll('[data-auth-index]'));
-    for(const row of rows){
-      const idx=row.getAttribute('data-auth-index')||'';
-      const name=row.getAttribute('data-name')||'';
-      const entry=byIndex[idx]||byName[name];
-      if(!entry) continue;
-      const plan=planFromAuthFile(entry);
-      let five=windowFromAuthFile(entry,'five_hour');
-      let weekly=windowFromAuthFile(entry,'weekly');
-      // Live 5h/weekly: same source CPA admin uses (api-call → wham/usage).
-      try{
-        const accountId=(entry.id_token&& (entry.id_token.chatgpt_account_id||entry.id_token.chatgptAccountId))||'';
-        const header={'Authorization':'Bearer $TOKEN$','Content-Type':'application/json','Accept':'application/json'};
-        if(accountId) header['Chatgpt-Account-Id']=accountId;
-        const ur=await fetch('/v0/management/api-call',{
-          method:'POST',
-          headers:{'Authorization':'Bearer '+k,'Content-Type':'application/json','Accept':'application/json'},
-          body:JSON.stringify({authIndex:idx, method:'GET', url:'https://chatgpt.com/backend-api/wham/usage', header:header})
-        });
-        if(ur.ok){
-          const uj=await ur.json();
-          const body=uj.body!=null?uj.body:(uj.Body!=null?uj.Body:uj);
-          let usage=body;
-          if(typeof usage==='string'){ try{usage=JSON.parse(usage);}catch(e){usage=null;} }
-          if(usage && typeof usage==='object'){
-            const p2=usage.plan_type||usage.planType||'';
-            if(p2 && !plan) {/* fill below */}
-            const f2=windowFromWham(usage,'five_hour');
-            const w2=windowFromWham(usage,'weekly');
-            if(f2) five=f2;
-            if(w2) weekly=w2;
-            applyQuotaToRow(row, plan||p2||'', five, weekly);
-            continue;
-          }
-        }
-      }catch(e){ /* keep auth-files plan only */ }
-      applyQuotaToRow(row, plan, five, weekly);
-    }
-  }catch(e){ if(o) o.textContent=String(e); }
-}
-const keyInput=document.getElementById('management-key');
-if(keyInput){
-  keyInput.addEventListener('change', ()=>{ enrichQuotaFromManagement(); });
-  keyInput.addEventListener('blur', ()=>{ enrichQuotaFromManagement(); });
 }
 renderTimes();
 </script>
@@ -974,46 +1136,57 @@ renderTimes();
 		html.EscapeString(t("refresh")),
 		html.EscapeString(t("actions_hint")),
 		html.EscapeString(t("rhythm_title")),
-		html.EscapeString(t("schedule_hint")),
+		html.EscapeString(t("rhythm_sub")),
 		timeline.String(),
+		customNextNote,
 		html.EscapeString(t("timezone")),
 		html.EscapeString(st.Timezone),
 		html.EscapeString(t("add_time")),
 		html.EscapeString(t("add")),
 		enabledChecked,
 		html.EscapeString(t("enable")),
-		html.EscapeString(t("principles_title")),
-		html.EscapeString(t("principles_body")),
+		html.EscapeString(t("how_title")),
+		html.EscapeString(t("how_body")),
+		html.EscapeString(t("how_global_off")), html.EscapeString(t("how_global_off_v")),
+		html.EscapeString(t("how_manual")), html.EscapeString(t("how_manual_v")),
+		html.EscapeString(t("how_quota_removed")), html.EscapeString(t("how_quota_removed_v")),
 		html.EscapeString(t("status")), principlesChipClass(st.Enabled), html.EscapeString(enabled),
-		html.EscapeString(t("col_5h")), html.EscapeString(t("principles_quota")),
-		html.EscapeString(t("last_run")), html.EscapeString(t("principles_persist")),
+		accountsFilledClass,
 		html.EscapeString(t("accounts_who_title")),
-		html.EscapeString(t("accounts_hint")),
+		html.EscapeString(t("accounts_times_sub")),
 		html.EscapeString(fmt.Sprintf(t("filter_all"), len(st.Accounts))),
 		html.EscapeString(fmt.Sprintf(t("filter_selected"), selectedN)),
-		html.EscapeString(fmt.Sprintf(t("filter_abnormal"), abnormalN)),
+		html.EscapeString(fmt.Sprintf(t("filter_custom"), customN)),
 		html.EscapeString(t("select_all")),
 		html.EscapeString(t("clear")),
 		html.EscapeString(banner),
-		rows.String(),
+		rows,
 		accountsEmptyClass,
-		html.EscapeString(t("accounts_empty_heading")),
+		html.EscapeString(t("accounts_none_title")),
 		html.EscapeString(t("accounts_empty_title")),
-		html.EscapeString(t("accounts_empty_body")),
-		html.EscapeString(t("accounts_empty_cta")),
+		html.EscapeString(t("accounts_none_body")),
+		html.EscapeString(t("accounts_none_cta")),
 		lastFilledClass,
-		html.EscapeString(t("last_run")),
-		html.EscapeString(t("last_run_sub")),
+		html.EscapeString(t("run_history_title")),
+		html.EscapeString(t("run_history_sub")),
 		lastBlock,
 		lastEmptyClass,
-		html.EscapeString(t("last_run")),
+		html.EscapeString(t("run_history_title")),
 		html.EscapeString(t("last_run_empty_title")),
 		html.EscapeString(t("last_run_empty_body")),
 		html.EscapeString(t("run_now")),
 		string(timesJSON),
+		string(accountTimesJSON),
 		nextSlot,
-		t("slot_next"),
+		t("slot_next_inherit"),
 		t("slot_past"),
+		t("sched_effective"),
+		t("sched_not_selected"),
+		t("sched_inherit"),
+		t("sched_custom"),
+		t("sched_custom_empty"),
+		t("hist_expand"),
+		t("hist_collapse"),
 		string(lang),
 		needKey,
 		saving,
@@ -1030,11 +1203,11 @@ func langActive(current, target Lang) string {
 
 func statusLabel(lang Lang, status string) string {
 	switch strings.ToLower(strings.TrimSpace(status)) {
-	case "success":
+	case "success", "ok":
 		return T(lang, "status_success")
 	case "limited":
 		return T(lang, "status_limited")
-	case "failed":
+	case "failed", "error":
 		return T(lang, "status_failed")
 	case "skipped":
 		return T(lang, "status_skipped")
@@ -1042,7 +1215,6 @@ func statusLabel(lang Lang, status string) string {
 		return status
 	}
 }
-
 
 func preferID(a runstate.AccountView) string {
 	if a.AuthIndex != "" {
@@ -1054,20 +1226,12 @@ func preferID(a runstate.AccountView) string {
 	return a.Name
 }
 
-func dash(s string) string {
-	if strings.TrimSpace(s) == "" {
-		return "—"
-	}
-	return html.EscapeString(s)
-}
-
 func orDash(s string) string {
 	if strings.TrimSpace(s) == "" {
 		return "—"
 	}
 	return s
 }
-
 
 func statusPillClass(enabled bool) string {
 	if enabled {
@@ -1076,7 +1240,6 @@ func statusPillClass(enabled bool) string {
 	return "neutral"
 }
 
-// principlesChipClass matches status-pill tone: ok when enabled, neutral chip when off.
 func principlesChipClass(enabled bool) string {
 	if enabled {
 		return "ok"
@@ -1084,8 +1247,6 @@ func principlesChipClass(enabled bool) string {
 	return ""
 }
 
-// rhythmSlot classifies a HH:MM slot relative to next and current local time.
-// Upcoming non-next slots return captionKey "" (not slot_past).
 func rhythmSlot(tm, nextSlot, nowHHMM string) (class, captionKey string) {
 	if nextSlot != "" && tm == nextSlot {
 		return "slot next", "slot_next"
@@ -1094,64 +1255,6 @@ func rhythmSlot(tm, nextSlot, nowHHMM string) (class, captionKey string) {
 		return "slot", "slot_past"
 	}
 	return "slot", ""
-}
-
-// quotaRemainingPct returns remaining percent when parseable from Remaining or Used.
-func quotaRemainingPct(w *hostapi.QuotaWindow) (float64, bool) {
-	if w == nil {
-		return 0, false
-	}
-	if w.Remaining != nil {
-		return *w.Remaining, true
-	}
-	if w.Used != nil {
-		return 100 - *w.Used, true
-	}
-	return 0, false
-}
-
-func quotaBarHTML(w *hostapi.QuotaWindow) string {
-	rem, ok := quotaRemainingPct(w)
-	if !ok {
-		return ""
-	}
-	width := rem
-	class := "bar"
-	if rem <= 0 {
-		class = "bar bad"
-		width = 2
-	} else if rem < 50 {
-		class = "bar warn"
-	}
-	if width > 100 {
-		width = 100
-	}
-	return fmt.Sprintf(`<div class="%s" data-bar-width="%.4g"><span style="width:%.4g%%"></span></div>`, class, width, width)
-}
-
-func formatWindow(w *hostapi.QuotaWindow, lang Lang) string {
-	if w == nil {
-		return "—"
-	}
-	parts := []string{}
-	if w.Remaining != nil {
-		parts = append(parts, fmt.Sprintf("%s %.4g", T(lang, "quota_remain"), *w.Remaining))
-	}
-	if w.Used != nil {
-		parts = append(parts, fmt.Sprintf("%s %.4g", T(lang, "quota_used"), *w.Used))
-	}
-	main := "—"
-	if len(parts) > 0 {
-		main = strings.Join(parts, " / ")
-	}
-	reset := ""
-	if w.ResetsAt != nil && !w.ResetsAt.IsZero() {
-		reset = `<small>` + html.EscapeString(T(lang, "quota_reset")) + ` ` + html.EscapeString(w.ResetsAt.Format("01-02 15:04")) + `</small>`
-	}
-	if main == "—" && reset == "" {
-		return "—"
-	}
-	return main + reset
 }
 
 func statusChipClass(status string) string {
@@ -1165,12 +1268,4 @@ func statusChipClass(status string) string {
 	default:
 		return ""
 	}
-}
-
-func accountAbnormal(a runstate.AccountView) bool {
-	if a.Unavailable || a.Disabled {
-		return true
-	}
-	s := strings.ToLower(strings.TrimSpace(a.Status))
-	return s == "limited" || s == "failed" || s == "unavailable" || s == "error"
 }

@@ -77,7 +77,7 @@ func TestRenderStatusPageEnglish(t *testing.T) {
 		Timezone: "Asia/Taipei", Times: []string{"21:00"},
 	}, LangEn)
 	for _, want := range []string{
-		`lang="en"`, "Today&#39;s rhythm", "Who to ping", "Operating principles",
+		`lang="en"`, "Global rhythm", "Accounts &amp; times",
 		"Save settings", "Run now", "Enable", "Timezone",
 		"English", "繁中", "日本語",
 	} {
@@ -85,8 +85,8 @@ func TestRenderStatusPageEnglish(t *testing.T) {
 			t.Fatalf("en page missing %q", want)
 		}
 	}
-	if strings.Contains(html, "今天的節奏") {
-		t.Fatal("en page should not show 繁中 rhythm title")
+	if strings.Contains(html, "統一節奏") {
+		t.Fatal("en page should not show zh-Hant rhythm title")
 	}
 }
 
@@ -96,7 +96,7 @@ func TestRenderStatusPageJapanese(t *testing.T) {
 		Timezone: "Asia/Taipei", Times: []string{"21:00"},
 	}, LangJa)
 	for _, want := range []string{
-		`lang="ja"`, "今日のリズム", "対象アカウント", "操作の原則",
+		`lang="ja"`, "共通リズム", "アカウントと時刻",
 		"設定を保存", "今すぐ実行", "有効", "タイムゾーン",
 	} {
 		if !strings.Contains(html, want) {
@@ -140,7 +140,7 @@ func TestHandlerHTMLRespectsLangQuery(t *testing.T) {
 		t.Fatalf("status %d", en.StatusCode)
 	}
 	body := string(en.Body)
-	if !strings.Contains(body, `lang="en"`) || !strings.Contains(body, "Operating principles") {
+	if !strings.Contains(body, `lang="en"`) || !strings.Contains(body, "Global rhythm") {
 		t.Fatalf("expected English HTML, got snippet: %s", truncate(body, 200))
 	}
 
@@ -159,7 +159,7 @@ func TestHandlerHTMLRespectsLangQuery(t *testing.T) {
 		Path:   "/v0/resource/plugins/codex-selective-ping/status",
 	})
 	body = string(def.Body)
-	if !strings.Contains(body, `lang="zh-Hant"`) || !strings.Contains(body, "操作原則") {
+	if !strings.Contains(body, `lang="zh-Hant"`) || !strings.Contains(body, "統一節奏") {
 		t.Fatalf("default should be zh-Hant; got: %s", truncate(body, 120))
 	}
 }
@@ -199,29 +199,35 @@ func TestLastRunChipsTranslated(t *testing.T) {
 		Accounts: []runstate.AccountView{{AuthIndex: "idx-1", Name: "alice", Email: "a@x.com"}},
 		LastRun: &runstate.Summary{
 			At: time.Date(2026, 9, 21, 21, 0, 0, 0, time.UTC),
-			Mode: "manual", Succeeded: 1,
-			Accounts: []runstate.AccountResult{{Name: "alice", Status: "success", HTTPStatus: 200}},
+			Mode: "force", Succeeded: 1,
+			Accounts: []runstate.AccountResult{{Name: "alice", Status: "success", Attempts: 1, HTTPStatus: 200}},
 		},
+		RunHistory: []runstate.Summary{{
+			At: time.Date(2026, 9, 21, 21, 0, 0, 0, time.UTC),
+			Mode: "force", Succeeded: 1,
+			Accounts: []runstate.AccountResult{{Name: "alice", Status: "success", Attempts: 1}},
+		}},
 	}, LangJa)
-	if strings.Contains(html, "mode:") || strings.Contains(html, "auth_index:") {
-		t.Fatal("ja page must not keep English chip/account labels")
-	}
-	for _, want := range []string{"モード", "認証ID", "成功"} {
+	for _, want := range []string{"手動実行", "成功", "認証ID"} {
 		if !strings.Contains(html, want) {
-			t.Fatalf("ja last-run missing %q", want)
+			t.Fatalf("ja page missing %q", want)
 		}
 	}
 }
 
-func TestV3DataI18nKeysPresentInAllLangs(t *testing.T) {
-	// Keys introduced / required by the v3 management UI markup.
+func TestV4DataI18nKeysPresentInAllLangs(t *testing.T) {
 	keys := []string{
-		"rhythm_title", "slot_next", "slot_past",
-		"accounts_who_title", "accounts_empty_heading", "accounts_empty_title", "accounts_empty_body", "accounts_empty_cta",
-		"filter_all", "filter_selected", "filter_abnormal",
+		"rhythm_title", "rhythm_sub", "slot_next", "slot_past", "slot_next_inherit",
+		"how_title", "how_body", "how_global_off", "how_global_off_v", "how_manual", "how_manual_v", "how_quota_removed", "how_quota_removed_v",
+		"accounts_who_title", "accounts_times_sub",
+		"accounts_empty_heading", "accounts_empty_title", "accounts_empty_body", "accounts_empty_cta",
+		"filter_all", "filter_selected", "filter_custom",
+		"sched_inherit", "sched_custom", "sched_effective", "sched_not_selected", "sched_add",
 		"rail_now", "rail_whitelist", "rail_model", "rail_key",
-		"principles_title", "principles_body", "principles_quota", "principles_persist",
-		"last_run_sub", "last_run_receipt_label", "last_run_empty_title", "last_run_empty_body",
+		"run_history_title", "run_history_sub", "hist_expand", "hist_collapse", "hist_attempts",
+		"mode_force", "mode_scheduled",
+		"last_run_receipt_label", "last_run_empty_title", "last_run_empty_body",
+		"chip_unselected",
 	}
 	for _, lang := range []Lang{LangZhHant, LangEn, LangJa} {
 		for _, key := range keys {

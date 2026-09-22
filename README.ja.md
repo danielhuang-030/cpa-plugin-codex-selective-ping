@@ -11,8 +11,8 @@
 
 - **許可リストのみ** — `accounts` に従う。空配列 → attempted は 0
 - **固定モデル** — `gpt-5.6-luna`（変更不可）
-- **日次スケジュール** — IANA タイムゾーン + `HH:MM`。CPA 起動時には ping しない
-- **管理 UI** — 繁体字中国語 / 英語 / 日本語（CPA 管理センターに追従。`?lang=` / `?theme=` で上書き可）
+- **日次スケジュール** — IANA タイムゾーン + グローバル `times`；任意のアカウント別 `account_times`。CPA 起動時には ping しない
+- **管理 UI** — 繁体字中国語 / 英語 / 日本語（CPA 管理センターに追従。`?lang=` / `?theme=` で上書き可）；アカウントごとの継承／カスタム予定；展開可能なアカウント別実行履歴
 - **直近実行の永続化** — `{CPA ルート}/data/codex-selective-ping/run_history.json`（`auth-dir` / `auths/` には書かない）
 - **プラグイン ID** — `codex-selective-ping` · 設定キー `plugins.configs.codex-selective-ping`
 
@@ -77,9 +77,15 @@ plugins:
       history_limit: 60
       retry_count: 2
       accounts:
-        - "user@example.com"
-        - "auth_index_or_name"
+        - "alice@example.com"
+        - "bob@example.com"
+      account_times:
+        bob@example.com:
+          - "07:30"
+          - "19:00"
 ```
+
+この例では alice はグローバルの 4 スロットを継承し、bob は `07:30` と `19:00` のみを使います。`account_times` を省略する（またはあるアカウントのリストを空にする）と、全員がグローバル `times` を使います。
 
 必要なら CPA を再起動／再読込し、ステータスページを開きます:
 
@@ -106,14 +112,17 @@ cp package/codex-selective-ping.so /path/to/cpa/plugins/
 | キー | 型 | 説明 |
 | --- | --- | --- |
 | `enabled` | bool | ホスト上のプラグインインスタンスのオン／オフ（CPA ライフサイクル） |
-| `schedule_enabled` | bool | 日次スケジュールのオン／オフ。`false` でも **今すぐ実行** は使える |
-| `timezone` | string | IANA タイムゾーン（例: `Asia/Taipei`） |
-| `times` | string[] | 1 つ以上の `HH:MM` |
+| `schedule_enabled` | bool | スケジュールのマスタースイッチ。`false` は**すべて**の予定 ping を止める（アカウント別カスタム含む）。**今すぐ実行** は使える |
+| `timezone` | string | グローバル IANA タイムゾーン（例: `Asia/Taipei`）。アカウント単位では設定しない |
+| `times` | string[] | 統一の日次デフォルト `HH:MM`（アカウントが継承するときに使用） |
 | `accounts` | string[] | 許可リスト。`auth_index`（完全一致）または email / name / account（大文字小文字無視）。空 → ping 0 回 |
+| `account_times` | map[string][]string | 任意。アカウント id → `HH:MM` リスト。欠落または空リスト → グローバル `times` を継承。`accounts` に無いキーは保存時に削除 |
 | `data_dir` | string | 任意。`run_history.json` のディレクトリ（相対パスは CPA cwd 基準） |
 | `history_limit` | int | 保持する実行履歴の上限（既定 **60**；≤0 は 60） |
 | `retry_count` | int | **limited**／クォータ失敗時に、何回追加で再試行するか。間隔は固定 **60 秒**（既定 **2**；`0` で無効）。limited 以外はこの経路で再試行しません。 |
 | `state_path` | string | 任意。直近実行ファイルのフルパス（`data_dir` より優先） |
+
+**スケジュール動作:** スケジューラは許可リスト各アカウントの実効時刻の**和集合**を待ちます（非空のカスタムがあればそれ、なければグローバル `times`）。ある `HH:MM` で発火したとき、そのスロットを実効時刻に含むアカウントだけを ping します。手動／**今すぐ実行** は許可リスト全体を対象にし、履歴に残ります（`force`）。
 
 既定の直近実行パス: `{CPA ルート}/data/codex-selective-ping/run_history.json`（`plugins/` の親）。
 
@@ -129,7 +138,8 @@ GET /v0/resource/plugins/codex-selective-ping/status
 
 - 言語: CPA 管理センター（`cli-proxy-language` / `Accept-Language`）。`?lang=zh-Hant|en|ja` で上書き（未対応は繁体字中国語）。本プラグインは CPA の言語キーを書きません。
 - テーマ: CPA に追従。`?theme=light|dark` で上書き（`<html data-theme>`）。
-- クォータ列（Plan / 5h / 週次）: Plan は Codex id_token（`chatgpt_plan_type`）。Management Key 入力後は CPA の `auth-files` + `api-call`（管理画面と同じ `wham/usage`）で 5h／週次を補完。無い場合は「—」（推測しない）。クォータは参考情報で、ping 対象には影響しません。
+- アカウント: 許可リストを選択。各アカウントはグローバル `times` を**継承**するか、**カスタム** `account_times` を使えます。アカウント UI に 5h／週次クォータ列は**出しません**。
+- 実行履歴: 各実行を展開 → アカウント別の状態／試行回数／エラー。スケジュール実行と force（手動）の両方を含みます。
 
 ### Management API
 
