@@ -33,6 +33,7 @@ type StatusResponse struct {
 	Timezone         string                 `json:"timezone"`
 	Times            []string               `json:"times"`
 	AccountsConfig   []string               `json:"accounts_config"`
+	AccountTimes     map[string][]string    `json:"account_times,omitempty"`
 	WindowSeconds    int64                  `json:"window_seconds"`
 	GuardSeconds     int64                  `json:"guard_seconds"`
 	MaxAttempts      int                    `json:"max_attempts"`
@@ -86,7 +87,7 @@ func (h *Handler) status() StatusResponse {
 	snap := h.Plugin.State.Snapshot(cfg.Accounts, enriched, h.Plugin.Sched.Next())
 	return StatusResponse{
 		Enabled: cfg.Enabled, Version: h.Plugin.Version, Model: pinger.ModelName,
-		Timezone: cfg.Timezone, Times: cfg.Times, AccountsConfig: cfg.Accounts,
+		Timezone: cfg.Timezone, Times: cfg.Times, AccountsConfig: cfg.Accounts, AccountTimes: cfg.AccountTimes,
 		WindowSeconds: int64(pinger.WindowInterval.Seconds()), GuardSeconds: int64(pinger.WindowGuard.Seconds()),
 		MaxAttempts: pinger.MaxAttempts, RetryBaseSeconds: int64(pinger.RetryBaseDelay.Seconds()),
 		NextRun: snap.NextRun, Running: snap.Running, LastRun: snap.LastRun, RunHistory: snap.RunHistory, Accounts: snap.Accounts,

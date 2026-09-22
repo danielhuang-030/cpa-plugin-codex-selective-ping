@@ -3,6 +3,7 @@ package config
 import (
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -11,14 +12,15 @@ import (
 var defaultTimes = []string{"06:00", "11:00", "16:00", "21:00"}
 
 type Config struct {
-	Enabled   bool     `json:"schedule_enabled"`
-	Timezone  string   `json:"timezone"`
-	Times     []string `json:"times"`
-	Accounts  []string `json:"accounts"`
-	DataDir      string `json:"data_dir,omitempty"`
-	StatePath    string `json:"state_path,omitempty"`
-	HistoryLimit int `json:"history_limit,omitempty"`
-	RetryCount   int `json:"retry_count,omitempty"`
+	Enabled      bool                `json:"schedule_enabled"`
+	Timezone     string              `json:"timezone"`
+	Times        []string            `json:"times"`
+	Accounts     []string            `json:"accounts"`
+	AccountTimes map[string][]string `json:"account_times,omitempty"`
+	DataDir      string              `json:"data_dir,omitempty"`
+	StatePath    string              `json:"state_path,omitempty"`
+	HistoryLimit int                 `json:"history_limit,omitempty"`
+	RetryCount   int                 `json:"retry_count,omitempty"`
 }
 
 func DefaultConfig() Config {
@@ -40,14 +42,15 @@ func Parse(raw string) (Config, error) {
 	}
 	if strings.HasPrefix(text, "{") {
 		var p struct {
-			ScheduleEnabled *bool    `json:"schedule_enabled"`
-			Timezone        string   `json:"timezone"`
-			Times           []string `json:"times"`
-			Accounts        []string `json:"accounts"`
-			DataDir         string `json:"data_dir"`
-			StatePath       string `json:"state_path"`
-			HistoryLimit    *int   `json:"history_limit"`
-			RetryCount      *int   `json:"retry_count"`
+			ScheduleEnabled *bool               `json:"schedule_enabled"`
+			Timezone        string              `json:"timezone"`
+			Times           []string            `json:"times"`
+			Accounts        []string            `json:"accounts"`
+			AccountTimes    map[string][]string `json:"account_times"`
+			DataDir         string              `json:"data_dir"`
+			StatePath       string              `json:"state_path"`
+			HistoryLimit    *int                `json:"history_limit"`
+			RetryCount      *int                `json:"retry_count"`
 		}
 		if err := json.Unmarshal([]byte(text), &p); err != nil {
 			return Config{}, fmt.Errorf("invalid JSON config: %w", err)
@@ -64,6 +67,9 @@ func Parse(raw string) (Config, error) {
 		}
 		if p.Accounts != nil {
 			cfg.Accounts = p.Accounts
+		}
+		if p.AccountTimes != nil {
+			cfg.AccountTimes = p.AccountTimes
 		}
 		if strings.TrimSpace(p.DataDir) != "" {
 			cfg.DataDir = strings.TrimSpace(p.DataDir)
@@ -87,17 +93,24 @@ func parseYAMLSubset(text string, cfg Config) (Config, error) {
 	mode := ""
 	var times []string
 	var accounts []string
+	accountTimes := map[string][]string{}
+	accountTimesKey := ""
+	inAccountTimes := false
 	for _, rawLine := range lines {
-		line := strings.TrimSpace(strings.SplitN(rawLine, "#", 2)[0])
+		trimmedComment := strings.SplitN(rawLine, "#", 2)[0]
+		line := strings.TrimSpace(trimmedComment)
 		if line == "" {
 			continue
 		}
-		if strings.HasPrefix(line, "-") && (mode == "times" || mode == "accounts") {
+		indent := len(trimmedComment) - len(strings.TrimLeft(trimmedComment, " \t"))
+		if strings.HasPrefix(line, "-") && (mode == "times" || mode == "accounts" || mode == "account_times_list") {
 			item := unquote(strings.TrimSpace(strings.TrimPrefix(line, "-")))
 			if mode == "times" {
 				times = append(times, item)
-			} else {
+			} else if mode == "accounts" {
 				accounts = append(accounts, item)
+			} else if mode == "account_times_list" && accountTimesKey != "" {
+				accountTimes[accountTimesKey] = append(accountTimes[accountTimesKey], item)
 			}
 			continue
 		}
@@ -107,7 +120,20 @@ func parseYAMLSubset(text string, cfg Config) (Config, error) {
 		}
 		key := strings.TrimSpace(parts[0])
 		value := strings.TrimSpace(parts[1])
+		if inAccountTimes && indent > 0 && key != "account_times" {
+			accountTimesKey = unquote(key)
+			mode = "account_times_list"
+			if value != "" {
+				accountTimes[accountTimesKey] = parseInlineList(value)
+				mode = ""
+			} else if _, ok := accountTimes[accountTimesKey]; !ok {
+				accountTimes[accountTimesKey] = nil
+			}
+			continue
+		}
 		mode = ""
+		accountTimesKey = ""
+		inAccountTimes = false
 		switch key {
 		case "schedule_enabled":
 			if value != "" {
@@ -159,6 +185,14 @@ func parseYAMLSubset(text string, cfg Config) (Config, error) {
 				}
 				cfg.RetryCount = n
 			}
+		case "account_times":
+			inAccountTimes = true
+			mode = "account_times"
+			if value != "" {
+				// Inline map forms are not supported by this YAML subset.
+				inAccountTimes = false
+				mode = ""
+			}
 		}
 	}
 	if times != nil {
@@ -166,6 +200,9 @@ func parseYAMLSubset(text string, cfg Config) (Config, error) {
 	}
 	if accounts != nil {
 		cfg.Accounts = accounts
+	}
+	if len(accountTimes) > 0 {
+		cfg.AccountTimes = accountTimes
 	}
 	return Validate(cfg)
 }
@@ -204,6 +241,47 @@ func Validate(cfg Config) (Config, error) {
 		}
 	}
 	cfg.Accounts = outAcc
+	allow := map[string]bool{}
+	for _, a := range cfg.Accounts {
+		allow[a] = true
+	}
+	if len(cfg.AccountTimes) > 0 {
+		outAT := make(map[string][]string, len(cfg.AccountTimes))
+		for acc, list := range cfg.AccountTimes {
+			acc = strings.TrimSpace(unquote(acc))
+			if acc == "" || !allow[acc] {
+				continue
+			}
+			if len(list) == 0 {
+				continue // empty ⇒ inherit (drop key)
+			}
+			seenAT := map[string]bool{}
+			normAT := make([]string, 0, len(list))
+			for _, v := range list {
+				v = strings.TrimSpace(unquote(v))
+				h, m, err := ParseClock(v)
+				if err != nil {
+					return Config{}, err
+				}
+				n := fmt.Sprintf("%02d:%02d", h, m)
+				if !seenAT[n] {
+					seenAT[n] = true
+					normAT = append(normAT, n)
+				}
+			}
+			if len(normAT) == 0 {
+				continue
+			}
+			outAT[acc] = normAT
+		}
+		if len(outAT) == 0 {
+			cfg.AccountTimes = nil
+		} else {
+			cfg.AccountTimes = outAT
+		}
+	} else {
+		cfg.AccountTimes = nil
+	}
 	cfg.DataDir = strings.TrimSpace(cfg.DataDir)
 	cfg.StatePath = strings.TrimSpace(cfg.StatePath)
 	if cfg.HistoryLimit <= 0 {
@@ -213,6 +291,55 @@ func Validate(cfg Config) (Config, error) {
 		cfg.RetryCount = 0
 	}
 	return cfg, nil
+}
+
+
+// EffectiveTimes returns the account's custom times when non-empty, otherwise global Times.
+func EffectiveTimes(cfg Config, account string) []string {
+	if cfg.AccountTimes != nil {
+		if custom, ok := cfg.AccountTimes[account]; ok && len(custom) > 0 {
+			return append([]string(nil), custom...)
+		}
+	}
+	return append([]string(nil), cfg.Times...)
+}
+
+// UnionTimes returns unique sorted HH:MM across allowlisted accounts' effective times.
+// If the allowlist is empty, returns a copy of global Times for next-run display stability.
+func UnionTimes(cfg Config) []string {
+	if len(cfg.Accounts) == 0 {
+		return append([]string(nil), cfg.Times...)
+	}
+	seen := map[string]bool{}
+	for _, acc := range cfg.Accounts {
+		for _, t := range EffectiveTimes(cfg, acc) {
+			seen[t] = true
+		}
+	}
+	out := make([]string, 0, len(seen))
+	for t := range seen {
+		out = append(out, t)
+	}
+	sort.Strings(out)
+	return out
+}
+
+// AccountsForSlot returns allowlisted accounts whose effective times contain normalized hhmm.
+func AccountsForSlot(cfg Config, hhmm string) []string {
+	hhmm = strings.TrimSpace(unquote(hhmm))
+	if h, m, err := ParseClock(hhmm); err == nil {
+		hhmm = fmt.Sprintf("%02d:%02d", h, m)
+	}
+	out := make([]string, 0)
+	for _, acc := range cfg.Accounts {
+		for _, t := range EffectiveTimes(cfg, acc) {
+			if t == hhmm {
+				out = append(out, acc)
+				break
+			}
+		}
+	}
+	return out
 }
 
 func ParseClock(value string) (int, int, error) {

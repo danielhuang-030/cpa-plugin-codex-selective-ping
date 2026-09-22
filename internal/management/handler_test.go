@@ -165,3 +165,64 @@ func TestStatusEnrichesPlanFromAuthGet(t *testing.T) {
 		t.Fatalf("plan=%q want plus (from AuthGet id_token)", st.Accounts[0].Plan)
 	}
 }
+
+func TestStatusJSONIncludesAccountTimes(t *testing.T) {
+	p := plugin.New(&mh{files: nil}, "0.1.0")
+	p.ApplyConfig(config.Config{
+		Enabled:  true,
+		Timezone: "UTC",
+		Times:    []string{"06:00"},
+		Accounts: []string{"alice@example.com", "bob@example.com"},
+		AccountTimes: map[string][]string{
+			"bob@example.com": {"07:30", "19:00"},
+		},
+	})
+	defer p.Shutdown()
+	h := &Handler{Plugin: p}
+	resp := h.Handle(Request{Method: "GET", Path: "/v0/management/plugins/codex-selective-ping/status"})
+	if resp.StatusCode != 200 {
+		t.Fatalf("%d %s", resp.StatusCode, resp.Body)
+	}
+	var raw map[string]any
+	if err := json.Unmarshal(resp.Body, &raw); err != nil {
+		t.Fatal(err)
+	}
+	at, ok := raw["account_times"]
+	if !ok {
+		t.Fatalf("status JSON must include account_times when set; keys=%v", raw)
+	}
+	m, ok := at.(map[string]any)
+	if !ok {
+		t.Fatalf("account_times type=%T want object", at)
+	}
+	bob, ok := m["bob@example.com"].([]any)
+	if !ok {
+		t.Fatalf("bob times=%#v", m["bob@example.com"])
+	}
+	if len(bob) != 2 || bob[0] != "07:30" || bob[1] != "19:00" {
+		t.Fatalf("bob times=%v want [07:30 19:00]", bob)
+	}
+}
+
+func TestStatusJSONOmitsEmptyAccountTimes(t *testing.T) {
+	p := plugin.New(&mh{files: nil}, "0.1.0")
+	p.ApplyConfig(config.Config{
+		Enabled:  true,
+		Timezone: "UTC",
+		Times:    []string{"06:00"},
+		Accounts: []string{"alice@example.com"},
+	})
+	defer p.Shutdown()
+	h := &Handler{Plugin: p}
+	resp := h.Handle(Request{Method: "GET", Path: "/v0/management/plugins/codex-selective-ping/status"})
+	if resp.StatusCode != 200 {
+		t.Fatalf("%d %s", resp.StatusCode, resp.Body)
+	}
+	var raw map[string]any
+	if err := json.Unmarshal(resp.Body, &raw); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := raw["account_times"]; ok {
+		t.Fatalf("account_times must be omitted when empty; got %#v", raw["account_times"])
+	}
+}

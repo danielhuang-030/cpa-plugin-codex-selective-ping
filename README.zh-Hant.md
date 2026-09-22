@@ -11,8 +11,8 @@
 
 - **只 ping 白名單** — 依 `accounts`；空陣列 → attempted 為 0
 - **固定模型** — `gpt-5.6-luna`（不可設定）
-- **每日排程** — IANA 時區 + `HH:MM`；CPA 啟動時不會立刻 ping
-- **管理 UI** — 繁中／英文／日文（跟隨 CPA 管理中心；可用 `?lang=` / `?theme=` 覆寫）
+- **每日排程** — IANA 時區 + 全域 `times`；可選每帳號 `account_times`；CPA 啟動時不會立刻 ping
+- **管理 UI** — 繁中／英文／日文（跟隨 CPA 管理中心；可用 `?lang=` / `?theme=` 覆寫）；每帳號繼承／自訂排程；可展開的依帳號執行歷史
 - **保留上次執行** — `{CPA 根目錄}/data/codex-selective-ping/run_history.json`（不會寫入 `auth-dir` / `auths/`）
 - **插件 ID** — `codex-selective-ping` · 設定鍵 `plugins.configs.codex-selective-ping`
 
@@ -77,9 +77,15 @@ plugins:
       history_limit: 60
       retry_count: 2
       accounts:
-        - "user@example.com"
-        - "auth_index_or_name"
+        - "alice@example.com"
+        - "bob@example.com"
+      account_times:
+        bob@example.com:
+          - "07:30"
+          - "19:00"
 ```
+
+此例中 alice 繼承全域四個時段；bob 只用 `07:30` 與 `19:00`。省略 `account_times`（或某帳號清單為空）則全員沿用全域 `times`。
 
 必要時重啟或重載 CPA，然後開啟狀態頁：
 
@@ -106,14 +112,17 @@ cp package/codex-selective-ping.so /path/to/cpa/plugins/
 | 鍵 | 型別 | 說明 |
 | --- | --- | --- |
 | `enabled` | bool | 宿主插件實例開關（CPA 生命週期） |
-| `schedule_enabled` | bool | 每日排程開關；`false` 時「立刻執行」仍可用 |
-| `timezone` | string | IANA 時區（如 `Asia/Taipei`） |
-| `times` | string[] | 一個以上的 `HH:MM` |
+| `schedule_enabled` | bool | 排程總開關。`false` 會停止**所有**排程 ping（含每帳號自訂時段）；「立刻執行」仍可用 |
+| `timezone` | string | 全域 IANA 時區（如 `Asia/Taipei`）；不可依帳號分開設定 |
+| `times` | string[] | 統一的每日預設 `HH:MM`（帳號繼承時使用） |
 | `accounts` | string[] | 白名單：`auth_index`（精確）或 email／name／account（不分大小寫）。空 → 0 次 ping |
+| `account_times` | map[string][]string | 可選。帳號 id → `HH:MM` 清單。缺漏或空清單 → 繼承全域 `times`。不在 `accounts` 內的鍵會在儲存時清除 |
 | `data_dir` | string | 可選。`run_history.json` 所在目錄（相對路徑相對 CPA cwd） |
 | `history_limit` | int | 最多保留幾筆執行紀錄（預設 **60**；≤0 視為 60） |
 | `retry_count` | int | 若結果為 **limited**／額度不足，再重試幾次，每次間隔 **60 秒**（預設 **2**；`0` 關閉）。非 limited 失敗不走此重試。 |
 | `state_path` | string | 可選。上次執行檔完整路徑（優先於 `data_dir`） |
+
+**排程行為：** 排程器等待白名單內各帳號「有效時段」的**聯集**（有非空自訂則用自訂，否則用全域 `times`）。每次觸發某個 `HH:MM` 時，只 ping 有效時段包含該時段的帳號。手動／「立刻執行」仍針對整份白名單，並寫入歷史（`force`）。
 
 預設上次執行路徑：`{CPA 根目錄}/data/codex-selective-ping/run_history.json`（`plugins/` 上一層）。
 
@@ -129,7 +138,8 @@ GET /v0/resource/plugins/codex-selective-ping/status
 
 - 語系：跟隨 CPA 管理中心（`cli-proxy-language`／`Accept-Language`）；`?lang=zh-Hant|en|ja` 可覆寫（不支援則繁中）。本插件不會寫入 CPA 語系鍵。
 - 主題：跟隨 CPA（`cli-proxy-theme` 等），`?theme=light|dark` 可覆寫（`<html data-theme>`）。
-- 額度欄（Plan／5h／週限）：Plan 來自 Codex id_token（`chatgpt_plan_type`）。有 Management Key 時，以 CPA `auth-files` + `api-call`（與管理中心相同的 `wham/usage`）補 5h／週限。缺資料顯示「—」，不推估；額度只供參考，不影響是否 ping。
+- 帳號：勾選白名單；每個帳號可**繼承**全域 `times` 或使用**自訂** `account_times`。帳號區塊**不**顯示 5h／週限額度欄。
+- 執行歷史：可展開每筆執行 → 依帳號顯示狀態／嘗試次數／錯誤；包含排程與 force（手動）執行。
 
 ### Management API
 

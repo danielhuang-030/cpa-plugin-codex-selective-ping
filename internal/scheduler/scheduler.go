@@ -12,15 +12,23 @@ type Scheduler struct {
 	mu      sync.Mutex
 	cancel  context.CancelFunc
 	next    time.Time
-	onFire  func(context.Context)
+	onFire  func(context.Context, time.Time)
 	setNext func(time.Time)
+	now     func() time.Time // nil => time.Now; tests may override
 }
 
-func New(onFire func(context.Context), setNext func(time.Time)) *Scheduler {
+func New(onFire func(context.Context, time.Time), setNext func(time.Time)) *Scheduler {
 	if setNext == nil {
 		setNext = func(time.Time) {}
 	}
 	return &Scheduler{onFire: onFire, setNext: setNext}
+}
+
+func (s *Scheduler) currentTime() time.Time {
+	if s.now != nil {
+		return s.now()
+	}
+	return time.Now()
 }
 
 func NextRun(now time.Time, loc *time.Location, times []string) time.Time {
@@ -41,6 +49,11 @@ func NextRun(now time.Time, loc *time.Location, times []string) time.Time {
 	return best
 }
 
+// NextRunFromConfig returns the next fire instant using the union of effective times.
+func NextRunFromConfig(now time.Time, loc *time.Location, cfg config.Config) time.Time {
+	return NextRun(now, loc, config.UnionTimes(cfg))
+}
+
 func (s *Scheduler) Start(cfg config.Config) {
 	s.Stop()
 	s.mu.Lock()
@@ -56,17 +69,22 @@ func (s *Scheduler) Start(cfg config.Config) {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	s.cancel = cancel
-	go s.loop(ctx, loc, append([]string(nil), cfg.Times...))
+	go s.loop(ctx, loc, config.UnionTimes(cfg))
 }
 
 func (s *Scheduler) loop(ctx context.Context, loc *time.Location, times []string) {
 	for {
-		next := NextRun(time.Now().In(loc), loc, times)
+		now := s.currentTime().In(loc)
+		next := NextRun(now, loc, times)
 		s.mu.Lock()
 		s.next = next
 		s.mu.Unlock()
 		s.setNext(next)
-		timer := time.NewTimer(time.Until(next))
+		delay := next.Sub(s.currentTime())
+		if delay < 0 {
+			delay = 0
+		}
+		timer := time.NewTimer(delay)
 		select {
 		case <-ctx.Done():
 			if !timer.Stop() {
@@ -78,7 +96,7 @@ func (s *Scheduler) loop(ctx context.Context, loc *time.Location, times []string
 			return
 		case <-timer.C:
 			if s.onFire != nil {
-				s.onFire(ctx)
+				s.onFire(ctx, next)
 			}
 		}
 	}

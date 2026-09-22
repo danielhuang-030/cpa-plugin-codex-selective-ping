@@ -276,3 +276,211 @@ func TestParseOmitsRetryCountDefaultsTo2(t *testing.T) {
 		t.Fatalf("RetryCount=%d want 2", cfg.RetryCount)
 	}
 }
+
+
+func TestParseJSONAccountTimes(t *testing.T) {
+	raw := `{
+		"schedule_enabled":true,
+		"timezone":"UTC",
+		"times":["06:00","11:00"],
+		"accounts":["alice@example.com","bob@example.com"],
+		"account_times":{"bob@example.com":["07:30","19:00"]}
+	}`
+	cfg, err := Parse(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cfg.AccountTimes) != 1 {
+		t.Fatalf("AccountTimes=%#v want 1 entry", cfg.AccountTimes)
+	}
+	got := cfg.AccountTimes["bob@example.com"]
+	if len(got) != 2 || got[0] != "07:30" || got[1] != "19:00" {
+		t.Fatalf("bob times=%#v", got)
+	}
+}
+
+func TestParseJSONOmitsAccountTimes(t *testing.T) {
+	cfg, err := Parse(`{"schedule_enabled":true,"timezone":"UTC","times":["06:00"],"accounts":["a"]}`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cfg.AccountTimes) != 0 {
+		t.Fatalf("AccountTimes=%#v want empty/nil", cfg.AccountTimes)
+	}
+}
+
+func TestParseYAMLAccountTimes(t *testing.T) {
+	raw := `
+schedule_enabled: true
+timezone: UTC
+times:
+  - "06:00"
+  - "11:00"
+accounts:
+  - alice@example.com
+  - bob@example.com
+account_times:
+  bob@example.com:
+    - "07:30"
+    - "19:00"
+`
+	cfg, err := Parse(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := cfg.AccountTimes["bob@example.com"]
+	if len(got) != 2 || got[0] != "07:30" || got[1] != "19:00" {
+		t.Fatalf("bob times=%#v AccountTimes=%#v", got, cfg.AccountTimes)
+	}
+}
+
+func TestEffectiveTimesInheritVsOverride(t *testing.T) {
+	cfg := Config{
+		Timezone: "UTC",
+		Times:    []string{"06:00", "11:00", "16:00", "21:00"},
+		Accounts: []string{"alice@example.com", "bob@example.com"},
+		AccountTimes: map[string][]string{
+			"bob@example.com": {"07:30", "19:00"},
+		},
+	}
+	alice := EffectiveTimes(cfg, "alice@example.com")
+	if len(alice) != 4 || alice[0] != "06:00" || alice[3] != "21:00" {
+		t.Fatalf("alice inherit=%#v", alice)
+	}
+	bob := EffectiveTimes(cfg, "bob@example.com")
+	if len(bob) != 2 || bob[0] != "07:30" || bob[1] != "19:00" {
+		t.Fatalf("bob override=%#v", bob)
+	}
+}
+
+func TestValidateEmptyAccountTimesListInherits(t *testing.T) {
+	cfg, err := Validate(Config{
+		Timezone: "UTC",
+		Times:    []string{"06:00"},
+		Accounts: []string{"alice@example.com", "bob@example.com"},
+		AccountTimes: map[string][]string{
+			"bob@example.com": {},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := cfg.AccountTimes["bob@example.com"]; ok {
+		t.Fatalf("empty custom list must delete key (inherit), got %#v", cfg.AccountTimes)
+	}
+	if EffectiveTimes(cfg, "bob@example.com")[0] != "06:00" {
+		t.Fatalf("bob should inherit global after empty prune")
+	}
+}
+
+func TestValidateRejectsBadAccountTime(t *testing.T) {
+	_, err := Validate(Config{
+		Timezone: "UTC",
+		Times:    []string{"06:00"},
+		Accounts: []string{"bob@example.com"},
+		AccountTimes: map[string][]string{
+			"bob@example.com": {"25:00"},
+		},
+	})
+	if err == nil || !strings.Contains(err.Error(), "time") {
+		t.Fatalf("err=%v", err)
+	}
+}
+
+func TestValidatePrunesOrphanAccountTimes(t *testing.T) {
+	cfg, err := Validate(Config{
+		Timezone: "UTC",
+		Times:    []string{"06:00"},
+		Accounts: []string{"alice@example.com"},
+		AccountTimes: map[string][]string{
+			"bob@example.com":   {"07:30"},
+			"alice@example.com": {"08:00"},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := cfg.AccountTimes["bob@example.com"]; ok {
+		t.Fatalf("orphan bob must be pruned, got %#v", cfg.AccountTimes)
+	}
+	got := cfg.AccountTimes["alice@example.com"]
+	if len(got) != 1 || got[0] != "08:00" {
+		t.Fatalf("alice times=%#v", got)
+	}
+}
+
+func TestValidateNormalizesAccountTimes(t *testing.T) {
+	cfg, err := Validate(Config{
+		Timezone: "UTC",
+		Times:    []string{"06:00"},
+		Accounts: []string{"bob@example.com"},
+		AccountTimes: map[string][]string{
+			"bob@example.com": {"7:30", "07:30", "19:00"},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := cfg.AccountTimes["bob@example.com"]
+	if len(got) != 2 || got[0] != "07:30" || got[1] != "19:00" {
+		t.Fatalf("normalized=%#v", got)
+	}
+}
+
+func TestUnionTimesAndAccountsForSlot(t *testing.T) {
+	cfg := Config{
+		Timezone: "UTC",
+		Times:    []string{"06:00", "11:00", "16:00", "21:00"},
+		Accounts: []string{"alice@example.com", "bob@example.com"},
+		AccountTimes: map[string][]string{
+			"bob@example.com": {"07:30", "19:00"},
+		},
+	}
+	union := UnionTimes(cfg)
+	wantUnion := []string{"06:00", "07:30", "11:00", "16:00", "19:00", "21:00"}
+	if len(union) != len(wantUnion) {
+		t.Fatalf("union=%#v want %#v", union, wantUnion)
+	}
+	for i := range wantUnion {
+		if union[i] != wantUnion[i] {
+			t.Fatalf("union=%#v want %#v", union, wantUnion)
+		}
+	}
+
+	at0600 := AccountsForSlot(cfg, "06:00")
+	if len(at0600) != 1 || at0600[0] != "alice@example.com" {
+		t.Fatalf("06:00 accounts=%#v", at0600)
+	}
+	at0730 := AccountsForSlot(cfg, "07:30")
+	if len(at0730) != 1 || at0730[0] != "bob@example.com" {
+		t.Fatalf("07:30 accounts=%#v", at0730)
+	}
+	at1100 := AccountsForSlot(cfg, "11:00")
+	if len(at1100) != 1 || at1100[0] != "alice@example.com" {
+		t.Fatalf("11:00 accounts=%#v", at1100)
+	}
+}
+
+func TestUnionTimesEmptyAllowlistReturnsGlobal(t *testing.T) {
+	cfg := Config{
+		Timezone: "UTC",
+		Times:    []string{"06:00", "21:00"},
+		Accounts: []string{},
+	}
+	union := UnionTimes(cfg)
+	if len(union) != 2 || union[0] != "06:00" || union[1] != "21:00" {
+		t.Fatalf("union=%#v want global Times", union)
+	}
+}
+
+func TestAccountsForSlotNormalizesHHMM(t *testing.T) {
+	cfg := Config{
+		Timezone: "UTC",
+		Times:    []string{"06:00"},
+		Accounts: []string{"alice@example.com"},
+	}
+	got := AccountsForSlot(cfg, "6:00")
+	if len(got) != 1 || got[0] != "alice@example.com" {
+		t.Fatalf("AccountsForSlot with unpadded hhmm=%#v", got)
+	}
+}

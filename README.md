@@ -11,8 +11,8 @@ A [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) (CPA) plugin that 
 
 - **Allowlist only** — pings `accounts`; empty list → 0 attempts
 - **Fixed model** — `gpt-5.6-luna` (not configurable)
-- **Daily schedule** — IANA timezone + `HH:MM` times; does not ping on CPA startup
-- **Management UI** — Traditional Chinese / English / Japanese (follows CPA Management Center; override with `?lang=` / `?theme=`)
+- **Daily schedule** — IANA timezone + global `times`; optional per-account `account_times`; does not ping on CPA startup
+- **Management UI** — Traditional Chinese / English / Japanese (follows CPA Management Center; override with `?lang=` / `?theme=`); per-account inherit/custom schedule; expandable run history by account
 - **Persisted last run** — `{CPA root}/data/codex-selective-ping/run_history.json` (never under `auth-dir` / `auths/`)
 - **Plugin ID** — `codex-selective-ping` · config key `plugins.configs.codex-selective-ping`
 
@@ -77,9 +77,15 @@ plugins:
       history_limit: 60
       retry_count: 2
       accounts:
-        - "user@example.com"
-        - "auth_index_or_name"
+        - "alice@example.com"
+        - "bob@example.com"
+      account_times:
+        bob@example.com:
+          - "07:30"
+          - "19:00"
 ```
+
+In this example alice inherits the four global slots; bob uses only `07:30` and `19:00`. Omit `account_times` (or leave an account’s list empty) to keep everyone on the global `times`.
 
 Restart or reload CPA if needed, then open the status page:
 
@@ -106,14 +112,17 @@ Then apply the `plugins.configs.codex-selective-ping` block above and restart CP
 | Key | Type | Description |
 | --- | --- | --- |
 | `enabled` | bool | Host plugin instance on/off (CPA lifecycle) |
-| `schedule_enabled` | bool | Daily schedule on/off; **Run now** still works when `false` |
-| `timezone` | string | IANA timezone (e.g. `Asia/Taipei`) |
-| `times` | string[] | One or more `HH:MM` values |
+| `schedule_enabled` | bool | Master schedule switch. `false` stops **all** scheduled pings (including per-account custom times); **Run now** still works |
+| `timezone` | string | Global IANA timezone (e.g. `Asia/Taipei`); not per-account |
+| `times` | string[] | Unified default daily `HH:MM` slots (used when an account inherits) |
 | `accounts` | string[] | Allowlist: `auth_index` (exact) or email / name / account (case-insensitive). Empty → 0 pings |
+| `account_times` | map[string][]string | Optional per-account `HH:MM` overrides. Missing or empty list for an account → inherit global `times`. Keys not in `accounts` are pruned on save |
 | `data_dir` | string | Optional. Directory for `run_history.json` (relative → CPA cwd) |
 | `history_limit` | int | Max stored runs (default **60**; ≤0 treated as 60) |
 | `retry_count` | int | After a **limited**/quota failure, retry this many more times waiting **60s** between tries (default **2**; `0` disables). Non-limited failures are not retried this way. |
 | `state_path` | string | Optional. Full path to the last-run file (wins over `data_dir`) |
+
+**Schedule behavior:** the scheduler waits on the **union** of every allowlisted account’s effective times (custom if non-empty, else global `times`). At each fire `HH:MM`, only accounts whose effective times contain that slot are pinged. Manual / **Run now** still targets the full allowlist and is recorded in history (`force`).
 
 Run history is stored newest-first in `run_history.json` (default under `{CPA root}/data/codex-selective-ping/`). A legacy single-object `last_run.json` in the same directory is migrated once and then deleted.
 
@@ -131,7 +140,8 @@ GET /v0/resource/plugins/codex-selective-ping/status
 
 - Language: CPA Management Center (`cli-proxy-language` / `Accept-Language`); override `?lang=zh-Hant|en|ja` (unsupported → Traditional Chinese). This plugin never writes CPA’s language key.
 - Theme: CPA (`cli-proxy-theme` / `cli-proxy-color-scheme` / `theme`, then `prefers-color-scheme`); override `?theme=light|dark` (`data-theme` on `<html>`).
-- Quota columns (Plan / 5h / weekly): Plan from the Codex id_token (`chatgpt_plan_type`). With a Management Key, live 5h/weekly come from CPA `auth-files` + `api-call` (same `wham/usage` path as admin). Missing values show "—" (never estimated). Quota is informational and does not change who gets pinged.
+- Accounts: select allowlist entries; each account can **inherit** the global `times` or use a **custom** `account_times` list. The account UI does **not** show 5h / weekly quota columns.
+- Run history: expandable per run → per-account status / attempts / error; includes scheduled and force (manual) runs.
 
 ### Management API
 

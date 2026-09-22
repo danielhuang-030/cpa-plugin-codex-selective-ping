@@ -1,0 +1,357 @@
+<!doctype html>
+<html lang="zh-Hant" data-theme="light" data-mode="filled">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Codex Selective Ping — mock v4 (#11)</title>
+<style>
+  :root, :root[data-theme="light"] {
+    --bg:#f6f1ea; --bg-2:#efe7dc; --ink:#1a1523; --ink-soft:#5b534c;
+    --line:#e0d5c8; --panel:#fffaf4; --panel-2:#f3ebe1;
+    --accent:#c45c26; --accent-ink:#fff7f0; --accent-2:#2f5d50;
+    --ok:#1f7a4c; --ok-bg:#e5f6ec; --warn:#a15c12; --warn-bg:#fff0d9;
+    --bad:#a11f2c; --bad-bg:#fde8ea; --chip:#ece3d7;
+    --shadow:0 18px 40px rgba(60,40,20,.08);
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    --sans:"Iowan Old Style","Palatino Linotype",Palatino,"Book Antiqua",Georgia,serif;
+    --ui:ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  }
+  :root[data-theme="dark"] {
+    --bg:#141018; --bg-2:#1c1620; --ink:#f4efe8; --ink-soft:#b9aea3;
+    --line:#3a3038; --panel:#1e1822; --panel-2:#261f2b;
+    --accent:#e08a52; --accent-ink:#1a1010; --accent-2:#7dbaa8;
+    --ok:#6dcaa0; --ok-bg:#1b3328; --warn:#e2b16a; --warn-bg:#3a2a14;
+    --bad:#f0a0a8; --bad-bg:#3a1a20; --chip:#2c2430;
+    --shadow:0 18px 40px rgba(0,0,0,.35);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--ui);line-height:1.45}
+  .mockbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:8px 14px;background:#2f5d50;color:#fff;font-size:12px}
+  .mockbar button{border:1px solid rgba(255,255,255,.35);background:transparent;color:#fff;border-radius:999px;padding:3px 10px;cursor:pointer;font-size:12px}
+  .mockbar button.on{background:#fff;color:#2f5d50}
+  .shell{max-width:1180px;margin:0 auto;padding:20px 16px 48px;display:grid;grid-template-columns:280px 1fr;gap:18px}
+  @media(max-width:960px){.shell{grid-template-columns:1fr}}
+  .rail{background:var(--panel);border:1px solid var(--line);border-radius:22px;padding:18px 16px 20px;box-shadow:var(--shadow);align-self:start;position:sticky;top:14px}
+  .brand{font-family:var(--sans);font-size:28px;line-height:1.05;letter-spacing:-.03em;margin:0 0 6px}
+  .brand em{font-style:italic;color:var(--accent);font-weight:600}
+  .lede{margin:0 0 16px;color:var(--ink-soft);font-size:13px}
+  .status-pill{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;background:var(--ok-bg);color:var(--ok);font-size:12px;font-weight:700}
+  .status-pill i{width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block}
+  .rail-block{margin-top:16px;padding-top:14px;border-top:1px dashed var(--line)}
+  .rail-block h3{margin:0 0 8px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-soft);font-weight:700}
+  .metric{display:flex;justify-content:space-between;align-items:baseline;padding:8px 0;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}
+  .metric:last-child{border-bottom:0}
+  .metric .k{color:var(--ink-soft);font-size:12px}
+  .metric .v{font-weight:700;font-size:14px}
+  .field{display:grid;gap:6px;font-size:12px;color:var(--ink-soft);font-weight:650}
+  input[type=text],input[type=password],input[type=time]{border:1px solid var(--line);background:var(--bg);border-radius:11px;padding:10px 11px;color:var(--ink);font:inherit;width:100%}
+  .primary-stack{display:grid;gap:8px;margin-top:14px}
+  button,.btn{font:inherit;cursor:pointer;border-radius:12px;border:0;padding:10px 12px;font-weight:700;font-size:13px}
+  .btn-primary{background:var(--accent);color:var(--accent-ink)}
+  .btn-secondary{background:var(--panel-2);color:var(--ink);border:1px solid var(--line)}
+  .btn-ghost{background:transparent;color:var(--ink-soft);border:1px dashed var(--line)}
+  .workspace{display:grid;gap:16px}
+  .hero{display:grid;grid-template-columns:1.35fr .65fr;gap:14px}
+  @media(max-width:960px){.hero{grid-template-columns:1fr}}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:22px;padding:18px;box-shadow:var(--shadow)}
+  .panel h2{margin:0 0 4px;font-family:var(--sans);font-size:22px;letter-spacing:-.02em}
+  .panel .sub{margin:0 0 14px;color:var(--ink-soft);font-size:13px}
+  .timeline{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+  @media(max-width:800px){.timeline{grid-template-columns:repeat(2,1fr)}}
+  .slot{background:var(--bg-2);border:1px solid var(--line);border-radius:16px;padding:12px 12px 14px;position:relative}
+  .slot .t{font-family:var(--mono);font-size:20px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-.03em}
+  .slot .caption{margin-top:4px;font-size:11px;color:var(--ink-soft)}
+  .slot .x{position:absolute;top:8px;right:10px;border:0;background:transparent;color:var(--ink-soft);font-size:16px;padding:0;cursor:pointer}
+  .slot.next{outline:2px solid var(--accent);background:color-mix(in srgb,var(--accent) 12%,var(--panel))}
+  .slot.next .caption{color:var(--accent);font-weight:700}
+  .add-row{display:flex;gap:8px;flex-wrap:wrap;align-items:end;margin-top:12px}
+  .accounts-head{display:flex;justify-content:space-between;gap:12px;align-items:end;flex-wrap:wrap;margin-bottom:12px}
+  .tabs{display:flex;gap:6px;flex-wrap:wrap}
+  .tab{border:1px solid var(--line);background:var(--bg-2);color:var(--ink-soft);border-radius:999px;padding:6px 11px;font-size:12px;font-weight:700}
+  .tab.on{background:var(--ink);color:var(--panel);border-color:var(--ink)}
+  .account-grid{display:grid;gap:12px}
+  .acct{
+    display:grid;gap:12px;padding:14px 16px;border-radius:18px;border:1px solid var(--line);background:var(--bg);
+  }
+  .acct.selected{background:color-mix(in srgb,var(--accent-2) 10%,var(--panel));border-color:color-mix(in srgb,var(--accent-2) 45%,var(--line))}
+  .acct-top{display:grid;grid-template-columns:28px 1fr auto;gap:10px;align-items:center}
+  .acct .name{font-weight:750;font-size:14px}
+  .acct .meta{color:var(--ink-soft);font-size:11px;margin-top:2px;font-family:var(--mono)}
+  .chip{display:inline-flex;align-items:center;padding:4px 9px;border-radius:999px;font-size:11px;font-weight:750;background:var(--chip);color:var(--ink)}
+  .chip.ok{background:var(--ok-bg);color:var(--ok)}
+  .chip.warn{background:var(--warn-bg);color:var(--warn)}
+  .chip.bad{background:var(--bad-bg);color:var(--bad)}
+  .sched-row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding-top:4px;border-top:1px dashed var(--line)}
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden;background:var(--panel)}
+  .seg button{border:0;background:transparent;padding:6px 12px;font-size:12px;font-weight:700;color:var(--ink-soft);border-radius:0}
+  .seg button.on{background:var(--ink);color:var(--panel)}
+  .mini-times{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+  .mini-times .pill{font-family:var(--mono);font-size:12px;font-weight:700;padding:4px 8px;border-radius:999px;background:var(--panel-2);border:1px solid var(--line)}
+  .mini-times .pill button{border:0;background:transparent;color:var(--ink-soft);margin-left:4px;cursor:pointer;padding:0;font-size:12px}
+  .hint{font-size:11px;color:var(--ink-soft)}
+  .run{display:grid;grid-template-columns:170px 1fr;gap:14px}
+  @media(max-width:800px){.run{grid-template-columns:1fr}}
+  .run-summary{background:var(--ink);color:var(--panel);border-radius:18px;padding:16px}
+  .run-summary .label{font-size:11px;letter-spacing:.08em;text-transform:uppercase;opacity:.7}
+  .run-summary .big{font-family:var(--sans);font-size:30px;margin:8px 0 4px;letter-spacing:-.03em}
+  .run-summary .meta{font-size:12px;opacity:.75;font-family:var(--mono)}
+  .hist{display:grid;gap:8px}
+  .hist-item{border:1px solid var(--line);border-radius:14px;background:var(--bg);overflow:hidden}
+  .hist-head{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:10px 12px;cursor:pointer;width:100%;border:0;background:transparent;color:inherit;text-align:left;font:inherit}
+  .hist-head:hover{background:color-mix(in srgb,var(--accent) 6%,transparent)}
+  .hist-head .left{display:grid;gap:2px}
+  .hist-head .title{font-weight:750;font-size:13px}
+  .hist-head .subline{font-size:11px;color:var(--ink-soft);font-family:var(--mono)}
+  .hist-body{display:none;padding:0 12px 12px;border-top:1px dashed var(--line)}
+  .hist-item.open .hist-body{display:grid;gap:6px;padding-top:10px}
+  .acct-line{display:flex;justify-content:space-between;gap:8px;align-items:center;padding:8px 10px;border-radius:12px;background:var(--panel);border:1px solid var(--line);font-size:12px}
+  .acct-line .who{font-weight:700}
+  .acct-line .detail{color:var(--ink-soft);font-family:var(--mono);font-size:11px}
+  .empty{border:1.5px dashed var(--line);border-radius:18px;padding:22px 18px;background:var(--bg-2)}
+  .empty strong{display:block;font-family:var(--sans);font-size:20px;margin-bottom:6px}
+  .empty p{margin:0 0 12px;color:var(--ink-soft);font-size:13px}
+  .hidden{display:none !important}
+  .foot{text-align:center;color:var(--ink-soft);font-size:11px;margin-top:8px}
+  html[data-mode="empty"] .filled-only{display:none !important}
+  html[data-mode="filled"] .empty-only{display:none !important}
+</style>
+</head>
+<body>
+<div class="mockbar">
+  <span>Mock v4 · #11 每帳號時刻表 · 無 5h／週限 · 歷史依帳號展開</span>
+  <button type="button" class="on" id="btn-light" onclick="setTheme('light')">Light</button>
+  <button type="button" id="btn-dark" onclick="setTheme('dark')">Dark</button>
+  <button type="button" class="on" id="btn-filled" onclick="setMode('filled')">有資料</button>
+  <button type="button" id="btn-empty" onclick="setMode('empty')">空狀態</button>
+</div>
+
+<div class="shell">
+  <aside class="rail">
+    <p class="brand">Selective<br/><em>Ping</em></p>
+    <p class="lede">統一節奏當預設；單一帳號可改成自己的時刻。關掉排程＝全部停；手動仍可跑並寫入歷史。</p>
+    <div class="status-pill"><i></i> 排程開啟 · v0.1.8</div>
+
+    <div class="rail-block">
+      <h3>此刻</h3>
+      <div class="metric"><span class="k">下次</span><span class="v">19:00</span></div>
+      <div class="metric"><span class="k">白名單</span><span class="v">3 / 4</span></div>
+      <div class="metric"><span class="k">模型</span><span class="v">gpt-5.4-mini</span></div>
+      <div class="metric"><span class="k">時區</span><span class="v">Asia/Taipei</span></div>
+    </div>
+
+    <div class="rail-block">
+      <h3>當次金鑰</h3>
+      <label class="field">Management Key
+        <input type="password" placeholder="貼上後才能儲存／執行"/>
+      </label>
+      <div class="primary-stack">
+        <button class="btn-primary" type="button">儲存設定</button>
+        <button class="btn-secondary" type="button">立刻執行</button>
+        <button class="btn-ghost" type="button">重新整理</button>
+      </div>
+    </div>
+  </aside>
+
+  <div class="workspace">
+    <section class="hero">
+      <div class="panel">
+        <h2>統一節奏</h2>
+        <p class="sub">所有「沿用統一」的帳號吃這份時刻。自訂帳號不在這裡改。</p>
+        <div class="timeline">
+          <div class="slot"><button class="x" type="button" aria-label="移除">×</button><div class="t">06:00</div><div class="caption">已過</div></div>
+          <div class="slot"><button class="x" type="button" aria-label="移除">×</button><div class="t">11:00</div><div class="caption">已過</div></div>
+          <div class="slot"><button class="x" type="button" aria-label="移除">×</button><div class="t">16:00</div><div class="caption">已過</div></div>
+          <div class="slot next"><button class="x" type="button" aria-label="移除">×</button><div class="t">21:00</div><div class="caption">即將 · 下次（沿用者）</div></div>
+        </div>
+        <div class="add-row">
+          <label class="field">時區<input type="text" value="Asia/Taipei"/></label>
+          <label class="field">新增時段<input type="time" value="21:00"/></label>
+          <button class="btn-secondary" type="button">加入時段</button>
+          <label style="display:flex;gap:8px;align-items:center;font-size:13px;font-weight:700;margin-left:auto">
+            <input type="checkbox" checked/> 啟用排程
+          </label>
+        </div>
+      </div>
+      <div class="panel" style="background:linear-gradient(160deg,color-mix(in srgb,var(--accent) 16%,var(--panel)),var(--panel))">
+        <h2 style="font-size:20px">怎麼算到點？</h2>
+        <p class="sub">系統看所有勾選帳號的「有效時刻」聯集。06:00 只打沿用／含 06:00 的帳號；bob 只在 07:30、19:00 被打。</p>
+        <div class="metric"><span class="k">全域關</span><span class="v">全部排程停</span></div>
+        <div class="metric"><span class="k">手動</span><span class="v">打完整白名單</span></div>
+        <div class="metric"><span class="k">額度欄</span><span class="v">已從帳號卡移除</span></div>
+      </div>
+    </section>
+
+    <section class="panel filled-only">
+      <div class="accounts-head">
+        <div>
+          <h2>帳號與時刻</h2>
+          <p class="sub" style="margin:0">勾選＝白名單。每張卡可「沿用統一」或「自訂時刻」。不再顯示 5h／週限。</p>
+        </div>
+        <div class="tabs">
+          <button class="tab on" type="button">全部</button>
+          <button class="tab" type="button">已選</button>
+          <button class="tab" type="button">自訂時刻</button>
+        </div>
+      </div>
+      <div class="account-grid">
+        <div class="acct selected" data-testid="account-schedule">
+          <div class="acct-top">
+            <input type="checkbox" checked/>
+            <div>
+              <div class="name">alice@example.com</div>
+              <div class="meta">auth_index · chatgpt · plan plus</div>
+            </div>
+            <span class="chip ok">就緒</span>
+          </div>
+          <div class="sched-row">
+            <div class="seg" role="group" aria-label="時刻模式">
+              <button type="button" class="on">沿用統一</button>
+              <button type="button">自訂</button>
+            </div>
+            <span class="hint">有效：06:00 · 11:00 · 16:00 · 21:00</span>
+          </div>
+        </div>
+
+        <div class="acct selected" data-testid="account-schedule">
+          <div class="acct-top">
+            <input type="checkbox" checked/>
+            <div>
+              <div class="name">bob@example.com</div>
+              <div class="meta">auth_index · chatgpt · plan team</div>
+            </div>
+            <span class="chip ok">就緒</span>
+          </div>
+          <div class="sched-row">
+            <div class="seg">
+              <button type="button">沿用統一</button>
+              <button type="button" class="on">自訂</button>
+            </div>
+            <div class="mini-times">
+              <span class="pill">07:30<button type="button" aria-label="移除">×</button></span>
+              <span class="pill">19:00<button type="button" aria-label="移除">×</button></span>
+              <input type="time" value="12:00" style="width:auto;padding:4px 8px"/>
+              <button class="btn-secondary" type="button" style="padding:6px 10px">加入</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="acct selected" data-testid="account-schedule">
+          <div class="acct-top">
+            <input type="checkbox" checked/>
+            <div>
+              <div class="name">carol@example.com</div>
+              <div class="meta">auth_index · chatgpt</div>
+            </div>
+            <span class="chip warn">上次 limited</span>
+          </div>
+          <div class="sched-row">
+            <div class="seg">
+              <button type="button" class="on">沿用統一</button>
+              <button type="button">自訂</button>
+            </div>
+            <span class="hint">有效：06:00 · 11:00 · 16:00 · 21:00</span>
+          </div>
+        </div>
+
+        <div class="acct" data-testid="account-schedule">
+          <div class="acct-top">
+            <input type="checkbox"/>
+            <div>
+              <div class="name">dave@example.com</div>
+              <div class="meta">未勾選 · 不參與排程／手動</div>
+            </div>
+            <span class="chip">未選</span>
+          </div>
+          <div class="sched-row">
+            <span class="hint">未在白名單 — 時刻設定儲存時會忽略／prune</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel empty-only">
+      <div class="empty">
+        <strong>還沒有 Codex 帳號</strong>
+        <p>CPA 認證檔出現後，這裡會列出帳號卡。可先設好統一節奏與時區。</p>
+        <button class="btn-primary" type="button">重新整理帳號</button>
+      </div>
+    </section>
+
+    <section class="panel filled-only">
+      <h2>執行與歷史</h2>
+      <p class="sub">最新收據 + 可展開歷史。手動（force）與排程都入史；展開後依帳號看結果。</p>
+      <div class="run">
+        <div class="run-summary">
+          <div class="label">最近一次</div>
+          <div class="big">2 ok</div>
+          <div class="meta">force · 21:04 · fail 0 · skip 1</div>
+        </div>
+        <div class="hist">
+          <div class="hist-item open">
+            <button class="hist-head" type="button" onclick="this.parentElement.classList.toggle('open')">
+              <div class="left">
+                <div class="title">手動執行 · 2 成功 · 1 略過</div>
+                <div class="subline">2026-09-22 21:04 · mode=force</div>
+              </div>
+              <span class="chip ok">展開中</span>
+            </button>
+            <div class="hist-body">
+              <div class="acct-line"><div><div class="who">alice@example.com</div><div class="detail">ok · attempts 1</div></div><span class="chip ok">ok</span></div>
+              <div class="acct-line"><div><div class="who">bob@example.com</div><div class="detail">ok · attempts 1</div></div><span class="chip ok">ok</span></div>
+              <div class="acct-line"><div><div class="who">carol@example.com</div><div class="detail">skipped_disabled</div></div><span class="chip">skip</span></div>
+            </div>
+          </div>
+          <div class="hist-item">
+            <button class="hist-head" type="button" onclick="this.parentElement.classList.toggle('open')">
+              <div class="left">
+                <div class="title">排程 19:00 · 僅 bob · 1 成功</div>
+                <div class="subline">2026-09-22 19:00 · mode=scheduled · slot 19:00</div>
+              </div>
+              <span class="chip">收合</span>
+            </button>
+            <div class="hist-body">
+              <div class="acct-line"><div><div class="who">bob@example.com</div><div class="detail">ok · attempts 1</div></div><span class="chip ok">ok</span></div>
+            </div>
+          </div>
+          <div class="hist-item">
+            <button class="hist-head" type="button" onclick="this.parentElement.classList.toggle('open')">
+              <div class="left">
+                <div class="title">排程 16:00 · alice+carol · 1 limited</div>
+                <div class="subline">2026-09-22 16:00 · mode=scheduled</div>
+              </div>
+              <span class="chip warn">有 limited</span>
+            </button>
+            <div class="hist-body">
+              <div class="acct-line"><div><div class="who">alice@example.com</div><div class="detail">ok · attempts 1</div></div><span class="chip ok">ok</span></div>
+              <div class="acct-line"><div><div class="who">carol@example.com</div><div class="detail">limited · attempts 3 · retry_count</div></div><span class="chip warn">limited</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel empty-only">
+      <div class="empty">
+        <strong>尚無執行紀錄</strong>
+        <p>排程到點或按「立刻執行」後，這裡會出現可展開的依帳號明細。</p>
+      </div>
+    </section>
+
+    <p class="foot">mock only · docs/superpowers/mocks/management-ui-mock-v4.html · issue #11</p>
+  </div>
+</div>
+
+<script>
+function setTheme(t){
+  document.documentElement.setAttribute('data-theme', t);
+  document.getElementById('btn-light').classList.toggle('on', t==='light');
+  document.getElementById('btn-dark').classList.toggle('on', t==='dark');
+}
+function setMode(m){
+  document.documentElement.setAttribute('data-mode', m);
+  document.getElementById('btn-filled').classList.toggle('on', m==='filled');
+  document.getElementById('btn-empty').classList.toggle('on', m==='empty');
+}
+</script>
+</body>
+</html>

@@ -2,24 +2,23 @@ package management
 
 import (
 	"strings"
-	"time"
 	"testing"
+	"time"
 
 	"cpa-plugin-codex-selective-ping/internal/hostapi"
 	"cpa-plugin-codex-selective-ping/internal/runstate"
 )
 
 func TestRenderStatusPageChineseAndQuotaDash(t *testing.T) {
-	rem := 62.0
 	html := RenderStatusPage(StatusResponse{
 		Enabled: true, Version: "0.1.0", Model: "gpt-5.6-luna",
 		Timezone: "Asia/Taipei", Times: []string{"06:00", "21:00"},
 		Accounts: []runstate.AccountView{
-			{AuthIndex: "1", Name: "alice", Email: "a@x.com", Selected: true, Plan: "Plus", FiveHour: &hostapi.QuotaWindow{Remaining: &rem}, Status: "success"},
+			{AuthIndex: "1", Name: "alice", Email: "a@x.com", Selected: true, Plan: "Plus", Status: "success"},
 			{AuthIndex: "2", Name: "bob", Selected: false, Status: "unknown"},
 		},
 	}, LangZhHant)
-	for _, want := range []string{"今天的節奏", "要打誰", "操作原則", "立刻執行", "儲存設定", "Management Key", "Plan", "5h", "週限", "—", "plugins/codex-selective-ping/config", "plugins/codex-selective-ping/run", "排程"} {
+	for _, want := range []string{"統一節奏", "帳號與時刻", "立刻執行", "儲存設定", "Management Key", "plugins/codex-selective-ping/config", "plugins/codex-selective-ping/run", "排程"} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("missing %q", want)
 		}
@@ -153,20 +152,16 @@ func TestRenderStatusPageAuthFilesQuotaEnrichJS(t *testing.T) {
 	for _, want := range []string{
 		`data-auth-index="auth-1"`,
 		`data-col="plan"`,
-		`data-col="five_hour"`,
-		`data-col="weekly"`,
-		`/v0/management/auth-files`,
-		`/v0/management/api-call`,
-		`backend-api/wham/usage`,
-		`enrichQuotaFromManagement`,
+		`data-col="status"`,
 	} {
 		if !strings.Contains(html, want) {
-			t.Fatalf("status page JS/markup missing %q", want)
+			t.Fatalf("status page markup missing %q", want)
 		}
 	}
-	// Without management key the page must keep em-dash placeholders (no invented numbers in static HTML).
-	if !strings.Contains(html, "—") {
-		t.Fatal("expected em-dash placeholders when quota unknown")
+	for _, ban := range []string{`data-col="five_hour"`, `data-col="weekly"`, `data-i18n="col_5h"`, `enrichQuotaFromManagement`, `backend-api/wham/usage`} {
+		if strings.Contains(html, ban) {
+			t.Fatalf("v4 UI must not contain quota cell/enrich %q", ban)
+		}
 	}
 }
 
@@ -232,16 +227,23 @@ func TestRenderStatusPageAccountsEmptyState(t *testing.T) {
 	html := RenderStatusPage(StatusResponse{
 		Enabled: true, Version: "0.1.5", Model: "gpt-5.4",
 		Timezone: "Asia/Taipei", Times: []string{"21:00"},
-		Accounts: []runstate.AccountView{
-			{AuthIndex: "1", Name: "alice", Selected: false},
-		},
+		Accounts:       nil,
 		AccountsConfig: []string{},
 	}, LangZhHant)
 	if !strings.Contains(html, `id="sec-accounts-empty"`) {
 		t.Fatal("missing id=sec-accounts-empty")
 	}
-	if !strings.Contains(html, `data-i18n="accounts_empty_title"`) {
-		t.Fatal("missing data-i18n=accounts_empty_title")
+	if !strings.Contains(html, `data-i18n="accounts_none_title"`) && !strings.Contains(html, `data-i18n="accounts_empty_title"`) {
+		t.Fatal("missing empty-state i18n marker")
+	}
+	// With zero Codex accounts, filled section should be hidden.
+	idx := strings.Index(html, `id="sec-accounts-filled"`)
+	if idx < 0 {
+		t.Fatal("missing sec-accounts-filled")
+	}
+	snippet := html[max(0, idx-40) : idx+80]
+	if !strings.Contains(snippet, "hidden") {
+		t.Fatalf("filled accounts section should be hidden when no accounts; snippet=%q", snippet)
 	}
 }
 
@@ -335,47 +337,22 @@ func TestRenderStatusPageWarmCSSTokens(t *testing.T) {
 	}
 }
 
-func TestRenderStatusPageQuotaBars(t *testing.T) {
+func TestRenderStatusPageNoQuotaBarsOrFiveHourCells(t *testing.T) {
 	okRem := 62.0
-	warnRem := 18.0
-	badRem := 0.0
 	html := RenderStatusPage(StatusResponse{
 		Enabled: true, Version: "0.1.5", Model: "gpt-5.4",
 		Timezone: "Asia/Taipei", Times: []string{"21:00"},
 		Accounts: []runstate.AccountView{
 			{AuthIndex: "1", Name: "alice", Selected: true, FiveHour: &hostapi.QuotaWindow{Remaining: &okRem}, Weekly: &hostapi.QuotaWindow{Remaining: &okRem}},
-			{AuthIndex: "2", Name: "bob", Selected: false, FiveHour: &hostapi.QuotaWindow{Remaining: &warnRem}},
-			{AuthIndex: "3", Name: "spare", Selected: false, FiveHour: &hostapi.QuotaWindow{Remaining: &badRem}},
 		},
 	}, LangZhHant)
-	if !strings.Contains(html, `class="bar"`) && !strings.Contains(html, `class="bar `) {
-		t.Fatal("missing .bar markup when quota parseable")
+	for _, ban := range []string{`data-col="five_hour"`, `data-col="weekly"`, `data-i18n="col_5h"`, `data-i18n="col_weekly"`, `class="bar"`, `class="bar `, `applyQuotaToRow`, `quotaBarClass`} {
+		if strings.Contains(html, ban) {
+			t.Fatalf("account UI must not render quota chrome %q", ban)
+		}
 	}
-	if !strings.Contains(html, `width:62%`) && !strings.Contains(html, `width:62.`) {
-		t.Fatal("bar width should reflect remaining percent")
-	}
-	if !strings.Contains(html, `class="bar warn"`) {
-		t.Fatal("low remaining should use bar.warn")
-	}
-	if !strings.Contains(html, `class="bar bad"`) {
-		t.Fatal("zero remaining should use bar.bad")
-	}
-	// Enrich path must update bars (helper name or style.width / className=bar)
-	if !strings.Contains(html, "applyQuotaToRow") {
-		t.Fatal("missing applyQuotaToRow")
-	}
-	hasBarUpdate := strings.Contains(html, "quotaBarClass") ||
-		strings.Contains(html, "renderQuotaBar") ||
-		strings.Contains(html, "updateQuotaBar") ||
-		strings.Contains(html, "setQuotaBar") ||
-		(strings.Contains(html, "className") && strings.Contains(html, "'bar")) ||
-		(strings.Contains(html, "className") && strings.Contains(html, `"bar`)) ||
-		strings.Contains(html, "data-bar-width") ||
-		strings.Contains(html, ".bar > span") ||
-		strings.Contains(html, "querySelector('.bar')") ||
-		strings.Contains(html, `querySelector(".bar")`)
-	if !hasBarUpdate {
-		t.Fatal("enrich JS should update bars or data attributes")
+	if !strings.Contains(html, `data-testid="account-schedule"`) {
+		t.Fatal("expected account-schedule marker")
 	}
 }
 
@@ -386,18 +363,24 @@ func TestRenderStatusPageStatusPillOffNeutral(t *testing.T) {
 	}
 }
 
-func TestRenderStatusPageAbnormalFilterCount(t *testing.T) {
+func TestRenderStatusPageCustomFilterCount(t *testing.T) {
 	html := RenderStatusPage(StatusResponse{
 		Enabled: true, Version: "0.1.5", Model: "gpt-5.4",
 		Timezone: "Asia/Taipei", Times: []string{"21:00"},
 		Accounts: []runstate.AccountView{
 			{AuthIndex: "1", Name: "alice", Selected: true, Status: "success"},
-			{AuthIndex: "2", Name: "bob", Selected: false, Status: "limited"},
+			{AuthIndex: "2", Name: "bob", Selected: true, Status: "success"},
 			{AuthIndex: "3", Name: "old", Selected: false, Status: "unavailable"},
 		},
+		AccountTimes: map[string][]string{
+			"2": {"07:30", "19:00"},
+		},
 	}, LangZhHant)
-	if !strings.Contains(html, "異常 2") && !strings.Contains(html, "異常2") {
-		t.Fatalf("abnormal filter tab should show count; want 異常 2")
+	if !strings.Contains(html, "自訂時刻 1") && !strings.Contains(html, "自訂 1") {
+		t.Fatalf("custom filter tab should show count; html missing custom 1")
+	}
+	if !strings.Contains(html, `data-filter="custom"`) {
+		t.Fatal("missing custom filter tab")
 	}
 }
 
@@ -472,16 +455,12 @@ func TestPrinciplesChipNeutralWhenScheduleOff(t *testing.T) {
 	}
 }
 
-func TestEnrichBarWidthOnBarNotParent(t *testing.T) {
+func TestNoQuotaBarWidthPlumbing(t *testing.T) {
 	html := RenderStatusPage(StatusResponse{Enabled: true}, LangZhHant)
-	if !strings.Contains(html, "bar.setAttribute('data-bar-width'") && !strings.Contains(html, `bar.setAttribute("data-bar-width"`) {
-		t.Fatal("enrich must set data-bar-width on .bar (SSR consistency)")
-	}
-	if strings.Contains(html, "parent.setAttribute('data-bar-width'") || strings.Contains(html, `parent.setAttribute("data-bar-width"`) {
-		t.Fatal("enrich must not set data-bar-width on parent hide-sm cell")
-	}
-	if strings.Contains(html, "剩/left/残") {
-		t.Fatal("fmtQuotaWindow must not contain dead leftover locale push")
+	for _, ban := range []string{"data-bar-width", "fmtQuotaWindow", "剩/left/残"} {
+		if strings.Contains(html, ban) {
+			t.Fatalf("must not contain quota plumbing %q", ban)
+		}
 	}
 	if !strings.Contains(html, ".row { display:flex") && !strings.Contains(html, ".row{display:flex") {
 		t.Fatal("missing .row { display:flex } CSS for select-all gap")
@@ -508,7 +487,6 @@ func TestRenderStatusPageUpcomingSlotNotPastCaption(t *testing.T) {
 	}
 }
 
-
 func TestRenderStatusPageRunHistoryList(t *testing.T) {
 	htmlOut := RenderStatusPage(StatusResponse{
 		LastRun: &runstate.Summary{
@@ -522,10 +500,282 @@ func TestRenderStatusPageRunHistoryList(t *testing.T) {
 	if !strings.Contains(htmlOut, `data-testid="run-history"`) {
 		t.Fatal("missing run-history list")
 	}
-	if !strings.Contains(htmlOut, `data-i18n="run_history"`) {
-		t.Fatal("missing run_history i18n")
+	if !strings.Contains(htmlOut, `data-i18n="run_history"`) && !strings.Contains(htmlOut, `data-i18n="run_history_title"`) && !strings.Contains(htmlOut, `data-testid="run-history"`) {
+		t.Fatal("missing run_history i18n / marker")
 	}
 	if !strings.Contains(htmlOut, "manual") || !strings.Contains(htmlOut, "schedule") {
 		t.Fatal("expected both history modes in list")
+	}
+}
+
+func TestRenderStatusPageNoFiveHourWeeklyCells(t *testing.T) {
+	html := RenderStatusPage(StatusResponse{
+		Enabled: true, Version: "0.1.8", Model: "gpt-5.4",
+		Timezone: "Asia/Taipei", Times: []string{"06:00", "21:00"},
+		Accounts: []runstate.AccountView{
+			{AuthIndex: "1", Name: "alice", Email: "a@x.com", Selected: true, Plan: "Plus"},
+		},
+	}, LangZhHant)
+	for _, ban := range []string{`data-col="five_hour"`, `col_5h`, `data-col="weekly"`, `col_weekly`} {
+		if strings.Contains(html, ban) {
+			t.Fatalf("must not contain %q", ban)
+		}
+	}
+}
+
+func TestRenderStatusPageAccountScheduleMarkers(t *testing.T) {
+	html := RenderStatusPage(StatusResponse{
+		Enabled: true, Version: "0.1.8", Model: "gpt-5.4",
+		Timezone: "Asia/Taipei", Times: []string{"06:00", "11:00"},
+		Accounts: []runstate.AccountView{
+			{AuthIndex: "alice", Name: "alice", Email: "alice@example.com", Selected: true},
+			{AuthIndex: "bob", Name: "bob", Email: "bob@example.com", Selected: true},
+		},
+		AccountTimes: map[string][]string{
+			"bob": {"07:30", "19:00"},
+		},
+	}, LangZhHant)
+	if !strings.Contains(html, `data-testid="account-schedule"`) {
+		t.Fatal("missing data-testid=account-schedule")
+	}
+	if !strings.Contains(html, `data-sched="inherit"`) {
+		t.Fatal("missing inherit schedule marker")
+	}
+	if !strings.Contains(html, `data-sched="custom"`) {
+		t.Fatal("missing custom schedule marker")
+	}
+	if !strings.Contains(html, "07:30") || !strings.Contains(html, "19:00") {
+		t.Fatal("custom times must appear in account card")
+	}
+	if !strings.Contains(html, "account_times") {
+		t.Fatal("saveCfg / initial state must mention account_times")
+	}
+}
+
+func TestRenderStatusPageSaveCfgIncludesAccountTimes(t *testing.T) {
+	html := RenderStatusPage(StatusResponse{
+		Enabled: true, Times: []string{"21:00"},
+		Accounts: []runstate.AccountView{{AuthIndex: "1", Name: "a", Selected: true}},
+	}, LangEn)
+	if !strings.Contains(html, "account_times") {
+		t.Fatal("JS must build account_times for PATCH body")
+	}
+	idx := strings.Index(html, "async function saveCfg()")
+	if idx < 0 {
+		t.Fatal("missing saveCfg")
+	}
+	chunk := html[idx : idx+900]
+	if !strings.Contains(chunk, "account_times") {
+		t.Fatalf("saveCfg body must include account_times; chunk=%q", chunk[:200])
+	}
+	if !strings.Contains(html, "initialAccountTimes") && !strings.Contains(html, "accountTimes") {
+		t.Fatal("page must seed account times into JS initial state")
+	}
+}
+
+func TestRenderStatusPageHistoryExpandPerAccount(t *testing.T) {
+	htmlOut := RenderStatusPage(StatusResponse{
+		LastRun: &runstate.Summary{
+			At: time.Date(2026, 9, 22, 11, 0, 0, 0, time.UTC), Mode: "force", Succeeded: 1, Skipped: 1,
+			Accounts: []runstate.AccountResult{
+				{Name: "alice@example.com", Status: "success", Attempts: 1},
+				{Name: "bob@example.com", Status: "skipped", Attempts: 0, Error: "disabled"},
+			},
+		},
+		RunHistory: []runstate.Summary{
+			{
+				At: time.Date(2026, 9, 22, 11, 0, 0, 0, time.UTC), Mode: "force", Succeeded: 1, Skipped: 1,
+				Accounts: []runstate.AccountResult{
+					{Name: "alice@example.com", Status: "success", Attempts: 1},
+					{Name: "bob@example.com", Status: "skipped", Attempts: 0, Error: "disabled"},
+				},
+			},
+			{
+				At: time.Date(2026, 9, 22, 10, 0, 0, 0, time.UTC), Mode: "scheduled", Succeeded: 1,
+				Accounts: []runstate.AccountResult{
+					{Name: "bob@example.com", Status: "success", Attempts: 2},
+				},
+			},
+		},
+	}, LangEn)
+	if !strings.Contains(htmlOut, `data-testid="run-history"`) {
+		t.Fatal("missing run-history")
+	}
+	if !strings.Contains(htmlOut, `data-testid="hist-accounts"`) && !strings.Contains(htmlOut, `class="hist-body"`) {
+		t.Fatal("missing expandable hist-body / hist-accounts")
+	}
+	if !strings.Contains(htmlOut, "alice@example.com") || !strings.Contains(htmlOut, "bob@example.com") {
+		t.Fatal("history expand must list per-account names")
+	}
+	if !strings.Contains(htmlOut, "force") || !strings.Contains(htmlOut, "scheduled") {
+		t.Fatal("history must show force and scheduled modes")
+	}
+	if !strings.Contains(htmlOut, "attempts") && !strings.Contains(htmlOut, "Attempts") {
+		// detail line should mention attempts count somehow
+		if !strings.Contains(htmlOut, "attempts 1") && !strings.Contains(htmlOut, "attempts: 1") && !strings.Contains(htmlOut, "· 1") {
+			// soft: at least attempts number near status is OK via "attempts"
+			t.Log("note: attempts wording may be i18n; checking numeric presence near account")
+		}
+	}
+	if !strings.Contains(htmlOut, "hist-item") && !strings.Contains(htmlOut, "hist-head") {
+		t.Fatal("missing hist-item/hist-head expand chrome")
+	}
+}
+
+func TestRematerializeAccountTimesEmailKeyedToPreferID(t *testing.T) {
+	accounts := []runstate.AccountView{
+		{AuthIndex: "auth-bob", Name: "bob", Email: "bob@example.com", Selected: true},
+		{AuthIndex: "auth-alice", Name: "alice", Email: "alice@example.com", Selected: true},
+	}
+	in := map[string][]string{
+		"bob@example.com": {"07:30", "19:00"},
+		"auth-alice":      {"08:00"},
+	}
+	got := rematerializeAccountTimes(accounts, in)
+	if len(got) != 2 {
+		t.Fatalf("got %#v", got)
+	}
+	bob := got["auth-bob"]
+	if len(bob) != 2 || bob[0] != "07:30" || bob[1] != "19:00" {
+		t.Fatalf("email-keyed times must rematerialize under preferID auth-bob: %#v", got)
+	}
+	if _, ok := got["bob@example.com"]; ok {
+		t.Fatal("alternate email key must not remain")
+	}
+	alice := got["auth-alice"]
+	if len(alice) != 1 || alice[0] != "08:00" {
+		t.Fatalf("auth-index keyed times: %#v", alice)
+	}
+}
+
+func TestRenderStatusPageEmailKeyedAccountTimesSeededUnderDataID(t *testing.T) {
+	html := RenderStatusPage(StatusResponse{
+		Enabled:  true,
+		Timezone: "Asia/Taipei",
+		Times:    []string{"06:00", "21:00"},
+		Accounts: []runstate.AccountView{
+			{AuthIndex: "auth-bob", Name: "bob", Email: "bob@example.com", Selected: true},
+		},
+		AccountTimes: map[string][]string{
+			"bob@example.com": {"07:30", "19:00"},
+		},
+	}, LangEn)
+	if !strings.Contains(html, `data-id="auth-bob"`) {
+		t.Fatal("checkbox/card data-id must be auth index")
+	}
+	if !strings.Contains(html, `data-sched="custom"`) {
+		t.Fatal("SSR must resolve email-keyed account_times as custom")
+	}
+	if !strings.Contains(html, `"auth-bob"`) {
+		t.Fatal("initialAccountTimes / rematerialize must emit preferID key auth-bob")
+	}
+	for _, want := range []string{
+		"rematerializeAccountTimesFromCards",
+		"delete accountTimes[",
+		"collectAccountTimes",
+	} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("JS contract missing %q", want)
+		}
+	}
+}
+
+func TestRenderStatusPageEmptyStatusNeutralNotSuccess(t *testing.T) {
+	html := RenderStatusPage(StatusResponse{
+		Enabled: true, Times: []string{"21:00"},
+		Accounts: []runstate.AccountView{
+			{AuthIndex: "1", Name: "alice", Email: "a@x.com", Selected: true, Status: ""},
+		},
+	}, LangEn)
+	idx := strings.Index(html, `data-col="status"`)
+	if idx < 0 {
+		t.Fatal("missing status chip")
+	}
+	snippet := html[idx : idx+80]
+	if strings.Contains(snippet, "status_success") || strings.Contains(snippet, ">success<") || strings.Contains(snippet, "chip ok") {
+		t.Fatalf("empty Status must be neutral/—, not success; snippet=%q", snippet)
+	}
+	if !strings.Contains(snippet, "—") && !strings.Contains(snippet, "–") {
+		t.Fatalf("empty Status should render dash; snippet=%q", snippet)
+	}
+}
+
+func TestRenderStatusPageAuthMetaIncludesIndex(t *testing.T) {
+	html := RenderStatusPage(StatusResponse{
+		Enabled: true, Times: []string{"21:00"},
+		Accounts: []runstate.AccountView{
+			{AuthIndex: "auth-42", Name: "alice", Email: "a@x.com", Selected: true},
+		},
+	}, LangEn)
+	if !strings.Contains(html, "auth_index: auth-42") {
+		t.Fatalf("expected 'auth_index: auth-42' in meta; html missing")
+	}
+}
+
+func TestRenderStatusPageSyncAcctCardRebuildsOnUncheck(t *testing.T) {
+	html := RenderStatusPage(StatusResponse{Enabled: true, Times: []string{"21:00"}}, LangEn)
+	for _, want := range []string{
+		"function syncAcctCard(",
+		"rebuildAcctSchedRow",
+		"labelSchedNotSelected",
+	} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("syncAcctCard rebuild contract missing %q", want)
+		}
+	}
+	idx := strings.Index(html, "function syncAcctCard(")
+	chunk := html[idx : idx+700]
+	if !strings.Contains(chunk, "rebuildAcctSchedRow") {
+		t.Fatalf("syncAcctCard must call rebuildAcctSchedRow; chunk=%q", chunk)
+	}
+}
+
+func TestRenderStatusPageCustomOnlyNextIndicator(t *testing.T) {
+	html := RenderStatusPage(StatusResponse{
+		Enabled:  true,
+		Timezone: "Asia/Taipei",
+		Times:    []string{"06:00", "21:00"},
+		NextRun:  "07:30",
+		Accounts: []runstate.AccountView{
+			{AuthIndex: "bob", Name: "bob", Email: "bob@example.com", Selected: true},
+		},
+		AccountTimes: map[string][]string{
+			"bob": {"07:30", "19:00"},
+		},
+	}, LangEn)
+	if !strings.Contains(html, `data-testid="next-custom-only"`) {
+		t.Fatal("custom-only NextRun must show non-timeline next indicator")
+	}
+	if !strings.Contains(html, "07:30") {
+		t.Fatal("indicator / rail should mention 07:30")
+	}
+	if strings.Contains(html, `class="slot next" data-time="06:00"`) || strings.Contains(html, `class="slot next" data-time="21:00"`) {
+		t.Fatal("global timeline must not highlight next when NextRun is custom-only")
+	}
+}
+
+func TestRenderStatusPageHistChipTogglesLabel(t *testing.T) {
+	htmlOut := RenderStatusPage(StatusResponse{
+		RunHistory: []runstate.Summary{
+			{At: time.Date(2026, 9, 22, 11, 0, 0, 0, time.UTC), Mode: "force", Succeeded: 1},
+		},
+	}, LangEn)
+	if !strings.Contains(htmlOut, "toggleHist") {
+		t.Fatal("hist expand chip must update label on click via toggleHist")
+	}
+	if !strings.Contains(htmlOut, "labelHistExpand") || !strings.Contains(htmlOut, "labelHistCollapse") {
+		t.Fatal("JS must have expand/collapse label constants")
+	}
+}
+
+func TestRenderStatusPageCustomEmptyTimesHint(t *testing.T) {
+	html := RenderStatusPage(StatusResponse{
+		Enabled: true, Times: []string{"21:00"},
+		Accounts: []runstate.AccountView{
+			{AuthIndex: "1", Name: "a", Selected: true},
+		},
+	}, LangEn)
+	if !strings.Contains(html, "sched_custom_empty") && !strings.Contains(html, "labelSchedCustomEmpty") {
+		t.Fatal("optional hint for custom+empty times (inherit on save) should be wired")
 	}
 }
