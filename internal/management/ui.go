@@ -390,11 +390,15 @@ func RenderStatusPage(st StatusResponse, lang Lang) string {
 	runningAttr := "false"
 	runDisabled := ""
 	runningBadgeHidden := " hidden"
+	runButtonLabel := t("run_now")
+	runIdleLabelAttr := fmt.Sprintf(` data-idle-label="%s"`, html.EscapeString(t("run_now")))
 	if st.Running {
 		runningAttr = "true"
 		runDisabled = " disabled"
 		runningBadgeHidden = ""
+		runButtonLabel = t("running_label")
 	}
+	runNowAttrs := runDisabled + runIdleLabelAttr
 
 	return fmt.Sprintf(`<!doctype html>
 <html lang="%s">
@@ -442,6 +446,7 @@ func RenderStatusPage(st StatusResponse, lang Lang) string {
   }
   @media (max-width: 960px) {
     .shell { grid-template-columns: 1fr }
+    .rail { position: static; top: auto; }
   }
   .rail {
     background: var(--panel);
@@ -491,6 +496,22 @@ func RenderStatusPage(st StatusResponse, lang Lang) string {
   .btn-primary { background: var(--accent); color: var(--accent-ink) }
   .btn-secondary { background: var(--panel-2); color: var(--ink); border: 1px solid var(--line) }
   .btn-ghost { background: transparent; color: var(--ink-soft); border: 1px dashed var(--line) }
+  .btn-primary:hover { filter: brightness(1.06) }
+  .btn-primary:active { transform: translateY(1px); filter: brightness(.96) }
+  .btn-secondary:hover { background: color-mix(in srgb, var(--ink) 6%%, var(--panel-2)) }
+  .btn-secondary:active { transform: translateY(1px) }
+  .btn-ghost:hover { color: var(--ink); border-style: solid }
+  .btn-ghost:active { transform: translateY(1px) }
+  button:disabled, .btn:disabled,
+  .btn-primary:disabled, .btn-secondary:disabled, .btn-ghost:disabled {
+    opacity: .55; cursor: not-allowed; filter: none; transform: none;
+  }
+  button:disabled:hover, button:disabled:active,
+  .btn-primary:disabled:hover, .btn-primary:disabled:active,
+  .btn-secondary:disabled:hover, .btn-secondary:disabled:active,
+  .btn-ghost:disabled:hover, .btn-ghost:disabled:active {
+    transform: none; filter: none;
+  }
   .field { display:grid; gap:6px; font-size:12px; color: var(--ink-soft); font-weight: 650 }
   input[type=text], input[type=password], input[type=time] {
     border: 1px solid var(--line); background: var(--bg);
@@ -761,6 +782,7 @@ const msgSaving = %q;
 const msgStarting = %q;
 const msgRunPolling = %q;
 const msgRunAlready = %q;
+const msgRunningLabel = %q;
 const POLL_MS = 2500;
 const STATUS_URL = '/v0/management/plugins/codex-selective-ping/status';
 const RUN_URL = '/v0/management/plugins/codex-selective-ping/run';
@@ -1161,7 +1183,22 @@ async function saveCfg(){
   }catch(e){ o.textContent=String(e); }
 }
 function setRunButtonsDisabled(on){
-  document.querySelectorAll('[data-run-now]').forEach(function(b){ b.disabled = !!on; });
+  document.querySelectorAll('[data-run-now]').forEach(function(b){
+    if(on){
+      if(!b.getAttribute('data-idle-label')){
+        b.setAttribute('data-idle-label', (b.textContent||'').trim());
+      }
+      b.textContent = msgRunningLabel;
+    } else {
+      var idle = b.getAttribute('data-idle-label');
+      if(idle){ b.textContent = idle; }
+    }
+    b.disabled = !!on;
+  });
+}
+function setRunningUI(on){
+  setRunButtonsDisabled(on);
+  showRunningBadge(on);
 }
 function showRunningBadge(on){
   const el = document.getElementById('running-badge');
@@ -1240,8 +1277,8 @@ renderTimes();
 		html.EscapeString(t("rail_key")),
 		html.EscapeString(t("key_placeholder")),
 		html.EscapeString(t("save")),
-		runDisabled,
-		html.EscapeString(t("run_now")),
+		runNowAttrs,
+		html.EscapeString(runButtonLabel),
 		html.EscapeString(t("refresh")),
 		html.EscapeString(t("actions_hint")),
 		html.EscapeString(t("rhythm_title")),
@@ -1283,8 +1320,8 @@ renderTimes();
 		html.EscapeString(t("run_history_title")),
 		html.EscapeString(t("last_run_empty_title")),
 		html.EscapeString(t("last_run_empty_body")),
-		runDisabled,
-		html.EscapeString(t("run_now")),
+		runNowAttrs,
+		html.EscapeString(runButtonLabel),
 		string(timesJSON),
 		string(accountTimesJSON),
 		nextSlot,
@@ -1303,6 +1340,7 @@ renderTimes();
 		starting,
 		runPolling,
 		runAlready,
+		t("running_label"),
 	)
 }
 
