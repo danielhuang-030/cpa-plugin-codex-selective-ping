@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"strings"
 
+	"cpa-plugin-codex-selective-ping/internal/config"
 	"cpa-plugin-codex-selective-ping/internal/hostapi"
 	"cpa-plugin-codex-selective-ping/internal/pinger"
 	"cpa-plugin-codex-selective-ping/internal/plugin"
@@ -86,7 +87,7 @@ func (h *Handler) status() StatusResponse {
 	}
 	snap := h.Plugin.State.Snapshot(cfg.Accounts, enriched, h.Plugin.Sched.Next())
 	return StatusResponse{
-		Enabled: cfg.Enabled, Version: h.Plugin.Version, Model: pinger.ModelName,
+		Enabled: cfg.Enabled, Version: h.Plugin.Version, Model: config.EffectiveModel(cfg, pinger.ModelName),
 		Timezone: cfg.Timezone, Times: cfg.Times, AccountsConfig: cfg.Accounts, AccountTimes: cfg.AccountTimes,
 		WindowSeconds: int64(pinger.WindowInterval.Seconds()), GuardSeconds: int64(pinger.WindowGuard.Seconds()),
 		MaxAttempts: pinger.MaxAttempts, RetryBaseSeconds: int64(pinger.RetryBaseDelay.Seconds()),

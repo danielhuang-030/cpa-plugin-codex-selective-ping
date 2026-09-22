@@ -10,7 +10,7 @@
 ## 功能
 
 - **只 ping 白名單** — 依 `accounts`；空陣列 → attempted 為 0
-- **固定模型** — `gpt-5.6-luna`（不可設定）
+- **可選模型** — 設定欄位 `model` 可選；空字串／省略 → 後備 `gpt-5.6-luna`
 - **每日排程** — IANA 時區 + 全域 `times`；可選每帳號 `account_times`；CPA 啟動時不會立刻 ping
 - **管理 UI** — 繁中／英文／日文（跟隨 CPA 管理中心；可用 `?lang=` / `?theme=` 覆寫）；每帳號繼承／自訂排程；可展開的依帳號執行歷史
 - **保留上次執行** — `{CPA 根目錄}/data/codex-selective-ping/run_history.json`（不會寫入 `auth-dir` / `auths/`）
@@ -76,6 +76,7 @@ plugins:
         - "21:00"
       history_limit: 60
       retry_count: 2
+      model: gpt-5.6-luna
       accounts:
         - "alice@example.com"
         - "bob@example.com"
@@ -120,6 +121,7 @@ cp package/codex-selective-ping.so /path/to/cpa/plugins/
 | `data_dir` | string | 可選。`run_history.json` 所在目錄（相對路徑相對 CPA cwd） |
 | `history_limit` | int | 最多保留幾筆執行紀錄（預設 **60**；≤0 視為 60） |
 | `retry_count` | int | 若結果為 **limited**／額度不足，再重試幾次，每次間隔 **60 秒**（預設 **2**；`0` 關閉）。非 limited 失敗不走此重試。 |
+| `model` | string | 可選。ping 使用的 Codex 模型 id。空字串／省略 → 後備 `gpt-5.6-luna` |
 | `state_path` | string | 可選。上次執行檔完整路徑（優先於 `data_dir`） |
 
 **排程行為：** 排程器等待白名單內各帳號「有效時段」的**聯集**（有非空自訂則用自訂，否則用全域 `times`）。每次觸發某個 `HH:MM` 時，只 ping 有效時段包含該時段的帳號。手動／「立刻執行」仍針對整份白名單，並寫入歷史（`force`）。

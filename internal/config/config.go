@@ -21,6 +21,7 @@ type Config struct {
 	StatePath    string              `json:"state_path,omitempty"`
 	HistoryLimit int                 `json:"history_limit,omitempty"`
 	RetryCount   int                 `json:"retry_count,omitempty"`
+	Model        string              `json:"model,omitempty"`
 }
 
 func DefaultConfig() Config {
@@ -51,6 +52,7 @@ func Parse(raw string) (Config, error) {
 			StatePath       string              `json:"state_path"`
 			HistoryLimit    *int                `json:"history_limit"`
 			RetryCount      *int                `json:"retry_count"`
+			Model           string              `json:"model"`
 		}
 		if err := json.Unmarshal([]byte(text), &p); err != nil {
 			return Config{}, fmt.Errorf("invalid JSON config: %w", err)
@@ -82,6 +84,9 @@ func Parse(raw string) (Config, error) {
 		}
 		if p.RetryCount != nil {
 			cfg.RetryCount = *p.RetryCount
+		}
+		if p.Model != "" {
+			cfg.Model = p.Model
 		}
 		return Validate(cfg)
 	}
@@ -185,6 +190,10 @@ func parseYAMLSubset(text string, cfg Config) (Config, error) {
 				}
 				cfg.RetryCount = n
 			}
+		case "model":
+			if value != "" {
+				cfg.Model = unquote(value)
+			}
 		case "account_times":
 			inAccountTimes = true
 			mode = "account_times"
@@ -284,6 +293,7 @@ func Validate(cfg Config) (Config, error) {
 	}
 	cfg.DataDir = strings.TrimSpace(cfg.DataDir)
 	cfg.StatePath = strings.TrimSpace(cfg.StatePath)
+	cfg.Model = strings.TrimSpace(cfg.Model)
 	if cfg.HistoryLimit <= 0 {
 		cfg.HistoryLimit = 60
 	}
@@ -293,6 +303,15 @@ func Validate(cfg Config) (Config, error) {
 	return cfg, nil
 }
 
+
+// EffectiveModel returns cfg.Model when non-empty after trim; otherwise fallback.
+// Call sites should pass pinger.ModelName as fallback to avoid config→pinger imports.
+func EffectiveModel(cfg Config, fallback string) string {
+	if m := strings.TrimSpace(cfg.Model); m != "" {
+		return m
+	}
+	return fallback
+}
 
 // EffectiveTimes returns the account's custom times when non-empty, otherwise global Times.
 func EffectiveTimes(cfg Config, account string) []string {

@@ -478,6 +478,15 @@ func RenderStatusPage(st StatusResponse, lang Lang) string {
   .metric:last-child { border-bottom: 0 }
   .metric .k { color: var(--ink-soft); font-size: 12px }
   .metric .v { font-weight: 700; font-size: 14px }
+  .metric.metric-model { align-items: center; gap: 8px }
+  #model-select {
+    max-width: 58%%; min-width: 0;
+    font: inherit; font-weight: 700; font-size: 13px;
+    border: 1px solid var(--line); border-radius: 8px;
+    background: var(--panel-2); color: var(--ink);
+    padding: 2px 6px;
+  }
+  #model-select-hint { font-size: 11px; color: var(--warn); margin: 4px 0 0; }
   .status-pill {
     display:inline-flex; align-items:center; gap:6px;
     padding: 6px 10px; border-radius: 999px;
@@ -679,7 +688,8 @@ func RenderStatusPage(st StatusResponse, lang Lang) string {
     <h3 data-i18n="rail_now">%s</h3>
     <div class="metric"><span class="k" data-i18n="next_run">%s</span><span class="v">%s</span></div>
     <div class="metric"><span class="k" data-i18n="rail_whitelist">%s</span><span class="v">%d / %d</span></div>
-    <div class="metric"><span class="k" data-i18n="rail_model">%s</span><span class="v">%s</span></div>
+    <div class="metric metric-model"><span class="k" data-i18n="rail_model">%s</span><select id="model-select" class="v" data-testid="model-select"><option value="%s" selected>%s</option></select></div>
+    <p id="model-select-hint" class="hint" hidden></p>
     <div class="metric"><span class="k" data-i18n="timezone">%s</span><span class="v">%s</span></div>
   </div>
   <div class="rail-block">
@@ -717,7 +727,6 @@ func RenderStatusPage(st StatusResponse, lang Lang) string {
 <p class="sub" data-i18n="how_body">%s</p>
 <div class="metric"><span class="k" data-i18n="how_global_off">%s</span><span class="v" data-i18n="how_global_off_v">%s</span></div>
 <div class="metric"><span class="k" data-i18n="how_manual">%s</span><span class="v" data-i18n="how_manual_v">%s</span></div>
-<div class="metric"><span class="k" data-i18n="how_quota_removed">%s</span><span class="v" data-i18n="how_quota_removed_v">%s</span></div>
 <div class="metric"><span class="k" data-i18n="status">%s</span><span class="v"><span class="chip %s">%s</span></span></div>
 </section>
 </section>
@@ -1176,6 +1185,7 @@ async function saveCfg(){
   if(!k){ o.textContent=msgNeedKey; return; }
   const account_times=collectAccountTimes();
   const body={schedule_enabled:document.getElementById('schedule_enabled').checked, timezone:document.getElementById('tz').value.trim(), times:times, accounts:selectedAccounts(), account_times:account_times};
+  body.model=document.getElementById('model-select').value.trim();
   o.textContent=msgSaving;
   try{
     const r=await fetch('/v0/management/plugins/codex-selective-ping/config',{method:'PATCH',headers:{'Authorization':'Bearer '+k,'Content-Type':'application/json'},body:JSON.stringify(body)});
@@ -1249,12 +1259,88 @@ async function runNow(){
     }
   }catch(e){ o.textContent=String(e); }
 }
+let selectedModel='';
+// sync with internal/modelfilter.Keep
+function keepModel(id, ownedBy){
+  const idLower=String(id||'').toLowerCase();
+  const ownedLower=String(ownedBy||'').toLowerCase();
+  const needles=['codex','openai','chatgpt','gpt-'];
+  for(const n of needles){
+    if(idLower.includes(n) || ownedLower.includes(n)) return true;
+  }
+  return false;
+}
+function setModelSelectHint(msg){
+  const hint=document.getElementById('model-select-hint');
+  if(!hint) return;
+  if(msg){ hint.textContent=msg; hint.hidden=false; }
+  else { hint.textContent=''; hint.hidden=true; }
+}
+function rebuildModelSelect(ids, current){
+  const sel=document.getElementById('model-select');
+  if(!sel) return;
+  const cur=(current||sel.value||'').trim();
+  const list=[];
+  const seen={};
+  (ids||[]).forEach(function(id){
+    id=String(id||'').trim();
+    if(!id || seen[id]) return;
+    seen[id]=true; list.push(id);
+  });
+  if(cur && !seen[cur]){ list.unshift(cur); }
+  if(!list.length && cur){ list.push(cur); }
+  sel.innerHTML='';
+  list.forEach(function(id){
+    const opt=document.createElement('option');
+    opt.value=id; opt.textContent=id;
+    if(id===cur) opt.selected=true;
+    sel.appendChild(opt);
+  });
+  if(cur) sel.value=cur;
+}
+async function loadModels(){
+  const sel=document.getElementById('model-select');
+  if(!sel) return;
+  const current=(sel.value||'').trim();
+  const k=key();
+  if(!k){ return; }
+  try{
+    const r=await fetch('/v1/models',{headers:{'Authorization':'Bearer '+k}});
+    if(!r.ok){
+      setModelSelectHint('models: HTTP '+r.status);
+      const o=document.getElementById('result');
+      if(o && !o.textContent) o.textContent='models: HTTP '+r.status;
+      return;
+    }
+    const j=await r.json();
+    const data=(j && Array.isArray(j.data)) ? j.data : [];
+    const kept=[];
+    data.forEach(function(m){
+      const id=m && m.id ? String(m.id) : '';
+      if(!id || !keepModel(id, m.owned_by||'')) return;
+      kept.push(id);
+    });
+    kept.sort();
+    rebuildModelSelect(kept, current);
+    setModelSelectHint('');
+  }catch(e){
+    setModelSelectHint(String(e));
+    const o=document.getElementById('result');
+    if(o && !o.textContent) o.textContent=String(e);
+  }
+}
 (function(){
   restoreKeyFromSession();
   const root = document.body;
   if(root && root.getAttribute('data-running')==='true'){
     enterRunningMode(msgRunPolling);
   }
+  const sel=document.getElementById('model-select');
+  if(sel){
+    sel.addEventListener('change', function(){ selectedModel = (sel.value||'').trim(); });
+    selectedModel = (sel.value||'').trim();
+  }
+  loadModels();
 })();
 renderTimes();
 </script>
@@ -1273,7 +1359,7 @@ renderTimes();
 		html.EscapeString(t("rail_now")),
 		html.EscapeString(t("next_run")), html.EscapeString(railNext),
 		html.EscapeString(t("rail_whitelist")), selectedN, len(st.Accounts),
-		html.EscapeString(t("rail_model")), html.EscapeString(st.Model),
+		html.EscapeString(t("rail_model")), html.EscapeString(st.Model), html.EscapeString(st.Model),
 		html.EscapeString(t("timezone")), html.EscapeString(st.Timezone),
 		html.EscapeString(t("rail_key")),
 		html.EscapeString(t("key_placeholder")),
@@ -1296,7 +1382,6 @@ renderTimes();
 		html.EscapeString(t("how_body")),
 		html.EscapeString(t("how_global_off")), html.EscapeString(t("how_global_off_v")),
 		html.EscapeString(t("how_manual")), html.EscapeString(t("how_manual_v")),
-		html.EscapeString(t("how_quota_removed")), html.EscapeString(t("how_quota_removed_v")),
 		html.EscapeString(t("status")), principlesChipClass(st.Enabled), html.EscapeString(enabled),
 		accountsFilledClass,
 		html.EscapeString(t("accounts_who_title")),

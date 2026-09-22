@@ -4,11 +4,13 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 
 	"cpa-plugin-codex-selective-ping/internal/config"
 	"cpa-plugin-codex-selective-ping/internal/hostapi"
+	"cpa-plugin-codex-selective-ping/internal/pinger"
 	"cpa-plugin-codex-selective-ping/internal/plugin"
 )
 
@@ -224,5 +226,63 @@ func TestStatusJSONOmitsEmptyAccountTimes(t *testing.T) {
 	}
 	if _, ok := raw["account_times"]; ok {
 		t.Fatalf("account_times must be omitted when empty; got %#v", raw["account_times"])
+	}
+}
+
+func TestStatusJSONShowsEffectiveModel(t *testing.T) {
+	p := plugin.New(&mh{files: nil}, "0.1.0")
+	p.ApplyConfig(config.Config{
+		Enabled:  true,
+		Timezone: "UTC",
+		Times:    []string{"06:00"},
+		Accounts: []string{},
+		Model:    "gpt-5",
+	})
+	defer p.Shutdown()
+	h := &Handler{Plugin: p}
+
+	resp := h.Handle(Request{Method: "GET", Path: "/v0/management/plugins/codex-selective-ping/status"})
+	if resp.StatusCode != 200 {
+		t.Fatalf("%d %s", resp.StatusCode, resp.Body)
+	}
+	var st StatusResponse
+	if err := json.Unmarshal(resp.Body, &st); err != nil {
+		t.Fatal(err)
+	}
+	if st.Model != "gpt-5" {
+		t.Fatalf("model=%q want gpt-5 (cfg.Model)", st.Model)
+	}
+
+	htmlResp := h.Handle(Request{Method: "GET", Path: "/v0/resource/plugins/codex-selective-ping/status"})
+	if htmlResp.StatusCode != 200 {
+		t.Fatalf("html %d %s", htmlResp.StatusCode, htmlResp.Body)
+	}
+	if !strings.Contains(string(htmlResp.Body), "gpt-5") {
+		t.Fatal("status HTML must show cfg.Model gpt-5")
+	}
+}
+
+func TestStatusJSONEmptyModelFallsBack(t *testing.T) {
+	p := plugin.New(&mh{files: nil}, "0.1.0")
+	p.ApplyConfig(config.Config{
+		Enabled:  true,
+		Timezone: "UTC",
+		Times:    []string{"06:00"},
+		Accounts: []string{},
+		Model:    "",
+	})
+	defer p.Shutdown()
+	h := &Handler{Plugin: p}
+
+	resp := h.Handle(Request{Method: "GET", Path: "/v0/management/plugins/codex-selective-ping/status"})
+	if resp.StatusCode != 200 {
+		t.Fatalf("%d %s", resp.StatusCode, resp.Body)
+	}
+	var st StatusResponse
+	if err := json.Unmarshal(resp.Body, &st); err != nil {
+		t.Fatal(err)
+	}
+	if st.Model != pinger.ModelName {
+		t.Fatalf("model=%q want %q (pinger.ModelName fallback)", st.Model, pinger.ModelName)
 	}
 }

@@ -3,6 +3,8 @@ package config
 import (
 	"strings"
 	"testing"
+
+	"cpa-plugin-codex-selective-ping/internal/pinger"
 )
 
 func TestDefaultConfigEmptyAccounts(t *testing.T) {
@@ -482,5 +484,67 @@ func TestAccountsForSlotNormalizesHHMM(t *testing.T) {
 	got := AccountsForSlot(cfg, "6:00")
 	if len(got) != 1 || got[0] != "alice@example.com" {
 		t.Fatalf("AccountsForSlot with unpadded hhmm=%#v", got)
+	}
+}
+
+
+func TestParseModel(t *testing.T) {
+	cfg, err := Parse(`{"schedule_enabled":true,"timezone":"Asia/Taipei","times":["06:00"],"model":"gpt-5"}`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Model != "gpt-5" {
+		t.Fatalf("model=%q", cfg.Model)
+	}
+}
+
+func TestParseYAMLModel(t *testing.T) {
+	raw := `
+schedule_enabled: true
+timezone: Asia/Taipei
+times: ["06:00"]
+model: gpt-5
+`
+	cfg, err := Parse(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Model != "gpt-5" {
+		t.Fatalf("model=%q", cfg.Model)
+	}
+}
+
+func TestParseOmitsModelLeavesEmpty(t *testing.T) {
+	cfg, err := Parse(`{"schedule_enabled":true,"timezone":"UTC","times":["06:00"]}`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Model != "" {
+		t.Fatalf("Model=%q want empty", cfg.Model)
+	}
+}
+
+func TestEffectiveModelEmptyFallsBack(t *testing.T) {
+	if got := EffectiveModel(Config{}, pinger.ModelName); got != pinger.ModelName {
+		t.Fatalf("got %q", got)
+	}
+}
+
+func TestEffectiveModelWhitespaceFallsBack(t *testing.T) {
+	if got := EffectiveModel(Config{Model: "  \t"}, pinger.ModelName); got != pinger.ModelName {
+		t.Fatalf("got %q", got)
+	}
+}
+
+func TestEffectiveModelUsesConfig(t *testing.T) {
+	if got := EffectiveModel(Config{Model: "gpt-5"}, pinger.ModelName); got != "gpt-5" {
+		t.Fatalf("got %q", got)
+	}
+}
+
+func TestDefaultConfigModelEmpty(t *testing.T) {
+	cfg := DefaultConfig()
+	if cfg.Model != "" {
+		t.Fatalf("Model default=%q want empty", cfg.Model)
 	}
 }
