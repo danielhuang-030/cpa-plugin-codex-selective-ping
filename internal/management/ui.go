@@ -446,7 +446,6 @@ func RenderStatusPage(st StatusResponse, lang Lang) string {
   }
   @media (max-width: 960px) {
     .shell { grid-template-columns: 1fr }
-    .rail { position: static; top: auto; }
   }
   .rail {
     background: var(--panel);
@@ -455,7 +454,9 @@ func RenderStatusPage(st StatusResponse, lang Lang) string {
     padding: 18px 16px 20px;
     box-shadow: var(--shadow);
     align-self: start;
-    position: sticky; top: 14px;
+  }
+  @media (min-width: 961px) {
+    .rail { position: sticky; top: 14px; }
   }
   .brand {
     font-family: var(--sans);
