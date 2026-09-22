@@ -916,3 +916,143 @@ func TestRenderStatusPageRunningBanner(t *testing.T) {
 		t.Fatal("expected showRunningBadge or setRunningUI to control running UI")
 	}
 }
+
+func TestRenderStatusPageMobileRailStatic(t *testing.T) {
+	html := RenderStatusPage(StatusResponse{Version: "0.1.9"}, LangZhHant)
+	mediaIdx := strings.Index(html, `@media (max-width: 960px)`)
+	if mediaIdx < 0 {
+		t.Fatal("expected @media (max-width: 960px) for mobile layout")
+	}
+	// Search within a reasonable window after the media query for .rail { position: static }
+	window := html[mediaIdx:]
+	if len(window) > 800 {
+		window = window[:800]
+	}
+	if !strings.Contains(window, `.rail`) {
+		t.Fatal("mobile @media (max-width: 960px) must target .rail")
+	}
+	if !strings.Contains(window, `position: static`) && !strings.Contains(window, `position:static`) {
+		t.Fatal("mobile .rail must use position: static to avoid sticky overlap")
+	}
+}
+
+func TestRenderStatusPageButtonPressFeedback(t *testing.T) {
+	html := RenderStatusPage(StatusResponse{Version: "0.1.9"}, LangZhHant)
+	for _, want := range []string{
+		`.btn-primary:hover`,
+		`.btn-primary:active`,
+		`.btn-secondary:hover`,
+		`.btn-secondary:active`,
+		`.btn-ghost:hover`,
+		`.btn-ghost:active`,
+	} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("missing press feedback style %q", want)
+		}
+	}
+	// Disabled must mute and block press transform / pointer
+	disabledOK := strings.Contains(html, `button:disabled`) || strings.Contains(html, `.btn:disabled`) ||
+		strings.Contains(html, `:disabled`) && strings.Contains(html, `cursor: not-allowed`)
+	if !disabledOK {
+		t.Fatal("expected :disabled styles with cursor: not-allowed")
+	}
+	if !strings.Contains(html, `cursor: not-allowed`) && !strings.Contains(html, `cursor:not-allowed`) {
+		t.Fatal("disabled buttons must use cursor: not-allowed")
+	}
+}
+
+func TestRenderStatusPageRunningRunButtonLabel(t *testing.T) {
+	assertRunNowButtons := func(t *testing.T, html string, running bool) {
+		t.Helper()
+		const marker = `onclick="runNow()" data-run-now`
+		count := 0
+		rest := html
+		for {
+			idx := strings.Index(rest, marker)
+			if idx < 0 {
+				break
+			}
+			count++
+			// Walk back to <button
+			prev := rest[:idx]
+			btnStart := strings.LastIndex(prev, "<button")
+			if btnStart < 0 {
+				t.Fatalf("runNow button #%d: missing <button", count)
+			}
+			fromBtn := rest[btnStart:]
+			gt := strings.Index(fromBtn, ">")
+			if gt < 0 {
+				t.Fatalf("runNow button #%d: open tag not closed", count)
+			}
+			openTag := fromBtn[:gt+1]
+			closeIdx := strings.Index(fromBtn[gt+1:], "</button>")
+			if closeIdx < 0 {
+				t.Fatalf("runNow button #%d: missing </button>", count)
+			}
+			inner := fromBtn[gt+1 : gt+1+closeIdx]
+			if !strings.Contains(openTag, `data-idle-label`) {
+				t.Fatalf("runNow button #%d must carry data-idle-label; tag=%q", count, openTag)
+			}
+			if running {
+				if !strings.Contains(openTag, "disabled") {
+					t.Fatalf("runNow button #%d must be disabled when Running; tag=%q", count, openTag)
+				}
+				if !strings.Contains(inner, "執行中") {
+					t.Fatalf("runNow button #%d text must be 執行中 when Running; got %q", count, inner)
+				}
+				if strings.Contains(inner, "立刻執行") {
+					t.Fatalf("runNow button #%d must not show 立刻執行 when Running; got %q", count, inner)
+				}
+			} else {
+				if !strings.Contains(inner, "立刻執行") {
+					t.Fatalf("idle runNow button #%d must show 立刻執行; got %q", count, inner)
+				}
+			}
+			rest = rest[idx+len(marker):]
+		}
+		if count < 1 {
+			t.Fatal("expected at least one onclick=runNow data-run-now button")
+		}
+	}
+
+	htmlOn := RenderStatusPage(StatusResponse{Running: true, Version: "0.1.9"}, LangZhHant)
+	assertRunNowButtons(t, htmlOn, true)
+
+	htmlOff := RenderStatusPage(StatusResponse{Running: false, Version: "0.1.9"}, LangZhHant)
+	assertRunNowButtons(t, htmlOff, false)
+}
+
+func TestRenderStatusPageRunningButtonJSLabelToggle(t *testing.T) {
+	html := RenderStatusPage(StatusResponse{Version: "0.1.9"}, LangZhHant)
+	for _, want := range []string{
+		`data-idle-label`,
+		`running_label`,
+	} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("missing marker %q for running button label toggle", want)
+		}
+	}
+	// JS must update [data-run-now] text when entering/leaving running
+	hasSetRunning := strings.Contains(html, "setRunningUI") || strings.Contains(html, "setRunButtonsDisabled")
+	if !hasSetRunning {
+		t.Fatal("expected setRunningUI or setRunButtonsDisabled")
+	}
+	// Must reference idle label restore and running label assignment
+	if !strings.Contains(html, "data-idle-label") {
+		t.Fatal("JS/HTML must use data-idle-label to store idle run button text")
+	}
+	if !strings.Contains(html, `getAttribute('data-idle-label')`) &&
+		!strings.Contains(html, `getAttribute("data-idle-label")`) &&
+		!strings.Contains(html, `.dataset.idleLabel`) &&
+		!strings.Contains(html, `dataset['idleLabel']`) {
+		t.Fatal("JS must restore idle label from data-idle-label when leaving running")
+	}
+	if !strings.Contains(html, "textContent") ||
+		(!strings.Contains(html, "msgRunningLabel") && !strings.Contains(html, "running_label") && !strings.Contains(html, "執行中")) {
+		t.Fatal("JS enter-running path must set button textContent to running label")
+	}
+	// Prefer explicit assignment of running label onto run buttons
+	if !strings.Contains(html, `[data-run-now]`) {
+		t.Fatal("JS must query [data-run-now] buttons")
+	}
+}
