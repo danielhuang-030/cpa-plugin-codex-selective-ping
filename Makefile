@@ -1,5 +1,5 @@
 PLUGIN_ID=codex-selective-ping
-VERSION=0.1.11
+VERSION=0.2.1
 
 .PHONY: test build-linux clean verify-product verify-version
 
