@@ -8,7 +8,7 @@ import (
 
 const (
 	pluginName = "codex-selective-ping"
-	version    = "0.1.8"
+	version    = "0.1.9"
 )
 
 func configFields(cfg config.Config) []map[string]any {
