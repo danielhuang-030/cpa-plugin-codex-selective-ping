@@ -48,7 +48,7 @@ plugins:
 商店會把 GitHub Release zip 解到 CPA 插件目錄（常見為 `plugins/`）：
 
 ```text
-codex-selective-ping_0.2.2_linux_amd64.zip
+codex-selective-ping_0.2.3_linux_amd64.zip
 └── codex-selective-ping.so
 ```
 
