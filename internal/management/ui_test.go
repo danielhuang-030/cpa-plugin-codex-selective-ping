@@ -779,3 +779,53 @@ func TestRenderStatusPageCustomEmptyTimesHint(t *testing.T) {
 		t.Fatal("optional hint for custom+empty times (inherit on save) should be wired")
 	}
 }
+
+func TestRenderStatusPageRunningBootstrap(t *testing.T) {
+	htmlOn := RenderStatusPage(StatusResponse{Running: true, Version: "0.1.9"}, LangZhHant)
+	if !strings.Contains(htmlOn, `data-running="true"`) {
+		t.Fatal("expected data-running=true when Running")
+	}
+	if !strings.Contains(htmlOn, `data-run-now`) {
+		t.Fatal("expected data-run-now markers on run buttons")
+	}
+	if !strings.Contains(htmlOn, `disabled`) {
+		t.Fatal("expected run controls disabled when running")
+	}
+	if !strings.Contains(htmlOn, `data-i18n="running_label"`) && !strings.Contains(htmlOn, "執行中") {
+		t.Fatal("expected running label visible when running")
+	}
+
+	htmlOff := RenderStatusPage(StatusResponse{Running: false, Version: "0.1.9"}, LangZhHant)
+	if !strings.Contains(htmlOff, `data-running="false"`) {
+		t.Fatal("expected data-running=false")
+	}
+}
+
+func TestRenderStatusPageRunNowPollsStatusNotFixedReload(t *testing.T) {
+	html := RenderStatusPage(StatusResponse{Version: "0.1.9"}, LangZhHant)
+	bad := []string{
+		`setTimeout(()=>location.reload(),1500)`,
+		`setTimeout(()=>location.reload(), 1500)`,
+		`setTimeout(() => location.reload(), 1500)`,
+	}
+	for _, b := range bad {
+		if strings.Contains(html, b) {
+			t.Fatalf("fixed 1500ms reload after run must be removed; found %q", b)
+		}
+	}
+	if strings.Contains(html, `setTimeout(()=>location.reload(),1500)`) {
+		t.Fatal("remove setTimeout(()=>location.reload(),1500) from runNow")
+	}
+	for _, want := range []string{
+		`/v0/management/plugins/codex-selective-ping/status`,
+		"enterRunningMode",
+		"2500",
+	} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("missing poll UX marker %q", want)
+		}
+	}
+	if !strings.Contains(html, "function runNow") && !strings.Contains(html, "async function runNow") {
+		t.Fatal("expected runNow function")
+	}
+}

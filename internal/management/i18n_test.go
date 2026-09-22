@@ -237,3 +237,23 @@ func TestV4DataI18nKeysPresentInAllLangs(t *testing.T) {
 		}
 	}
 }
+
+func TestRunPollingI18nKeysPresentInAllLangs(t *testing.T) {
+	keys := []string{"running_label", "run_polling", "run_already"}
+	for _, lang := range []Lang{LangZhHant, LangEn, LangJa} {
+		for _, key := range keys {
+			if got := T(lang, key); got == key || strings.TrimSpace(got) == "" {
+				t.Fatalf("%s missing translation for %q (got %q)", lang, key, got)
+			}
+		}
+	}
+	if got := T(LangZhHant, "run_polling"); !strings.Contains(got, "執行") {
+		t.Fatalf("zh-Hant run_polling unexpected: %q", got)
+	}
+	if got := T(LangEn, "run_already"); !strings.Contains(strings.ToLower(got), "already") {
+		t.Fatalf("en run_already unexpected: %q", got)
+	}
+	if got := T(LangJa, "run_polling"); !strings.Contains(got, "実行") {
+		t.Fatalf("ja run_polling unexpected: %q", got)
+	}
+}

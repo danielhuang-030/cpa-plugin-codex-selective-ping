@@ -384,6 +384,17 @@ func RenderStatusPage(st StatusResponse, lang Lang) string {
 	needKey := t("need_key")
 	saving := t("saving")
 	starting := t("starting")
+	runPolling := t("run_polling")
+	runAlready := t("run_already")
+
+	runningAttr := "false"
+	runDisabled := ""
+	runningBadgeHidden := " hidden"
+	if st.Running {
+		runningAttr = "true"
+		runDisabled = " disabled"
+		runningBadgeHidden = ""
+	}
 
 	return fmt.Sprintf(`<!doctype html>
 <html lang="%s">
@@ -611,7 +622,7 @@ func RenderStatusPage(st StatusResponse, lang Lang) string {
   }
 </style>
 </head>
-<body>
+<body data-running="%s">
 <div class="shell">
 <aside class="rail">
   <p class="brand">Selective<br/><em>Ping</em></p>
@@ -622,6 +633,7 @@ func RenderStatusPage(st StatusResponse, lang Lang) string {
     <a href="?lang=ja" class="%s" data-lang="ja">%s</a>
   </nav>
   <div class="status-pill %s"><i></i> %s · v%s</div>
+  <span id="running-badge" class="chip warn" data-i18n="running_label"%s>%s</span>
   <div class="rail-block">
     <h3 data-i18n="rail_now">%s</h3>
     <div class="metric"><span class="k" data-i18n="next_run">%s</span><span class="v">%s</span></div>
@@ -636,7 +648,7 @@ func RenderStatusPage(st StatusResponse, lang Lang) string {
     </label>
     <div class="primary-stack">
       <button class="btn-primary" type="button" onclick="saveCfg()" data-i18n="save">%s</button>
-      <button class="btn-secondary" type="button" onclick="runNow()" data-i18n="run_now">%s</button>
+      <button class="btn-secondary" type="button" onclick="runNow()" data-run-now%s data-i18n="run_now">%s</button>
       <button class="btn-ghost" type="button" onclick="location.reload()" data-i18n="refresh">%s</button>
     </div>
     <p class="hint" data-i18n="actions_hint">%s</p>
@@ -705,7 +717,7 @@ func RenderStatusPage(st StatusResponse, lang Lang) string {
 <div class="empty">
 <strong data-i18n="last_run_empty_title">%s</strong>
 <p data-i18n="last_run_empty_body">%s</p>
-<button class="btn-secondary" type="button" onclick="runNow()" data-i18n="run_now">%s</button>
+<button class="btn-secondary" type="button" onclick="runNow()" data-run-now%s data-i18n="run_now">%s</button>
 </div>
 </section>
 </div>
@@ -728,6 +740,12 @@ const serverLang = %q;
 const msgNeedKey = %q;
 const msgSaving = %q;
 const msgStarting = %q;
+const msgRunPolling = %q;
+const msgRunAlready = %q;
+const POLL_MS = 2500;
+const STATUS_URL = '/v0/management/plugins/codex-selective-ping/status';
+const RUN_URL = '/v0/management/plugins/codex-selective-ping/run';
+let pollTimer = null;
 let times = Array.isArray(initialTimes) ? initialTimes.slice() : [];
 let accountTimes = (initialAccountTimes && typeof initialAccountTimes === 'object') ? JSON.parse(JSON.stringify(initialAccountTimes)) : {};
 let accountSched = {};
@@ -1103,27 +1121,74 @@ async function saveCfg(){
     if(r.ok){ setTimeout(()=>location.reload(),800);}
   }catch(e){ o.textContent=String(e); }
 }
+function setRunButtonsDisabled(on){
+  document.querySelectorAll('[data-run-now]').forEach(function(b){ b.disabled = !!on; });
+}
+function showRunningBadge(on){
+  const el = document.getElementById('running-badge');
+  if(el){ el.hidden = !on; }
+}
+function enterRunningMode(msg){
+  setRunButtonsDisabled(true);
+  showRunningBadge(true);
+  const o = document.getElementById('result');
+  if(o && msg){ o.textContent = msg; }
+  startPolling();
+}
+async function pollOnce(){
+  const k = key();
+  if(!k){ const o=document.getElementById('result'); if(o) o.textContent=msgNeedKey; return; }
+  try{
+    const r = await fetch(STATUS_URL,{headers:{'Authorization':'Bearer '+k}});
+    const j = await r.json();
+    if(j && j.running === false){
+      if(pollTimer){ clearInterval(pollTimer); pollTimer=null; }
+      location.reload();
+      return;
+    }
+  }catch(e){
+    const o=document.getElementById('result');
+    if(o){ o.textContent=String(e); }
+  }
+}
+function startPolling(){
+  if(pollTimer) return;
+  pollTimer = setInterval(pollOnce, POLL_MS);
+  pollOnce();
+}
 async function runNow(){
   const o=document.getElementById('result'); const k=key();
   if(!k){ o.textContent=msgNeedKey; return; }
+  if(pollTimer){ enterRunningMode(msgRunPolling); return; }
   o.textContent=msgStarting;
   try{
-    const r=await fetch('/v0/management/plugins/codex-selective-ping/run',{method:'POST',headers:{'Authorization':'Bearer '+k}});
-    o.textContent=await r.text();
-    if(r.ok){ setTimeout(()=>location.reload(),1500);}
+    const r=await fetch(RUN_URL,{method:'POST',headers:{'Authorization':'Bearer '+k}});
+    const text=await r.text();
+    o.textContent=text;
+    if(r.ok || r.status===409){
+      enterRunningMode(r.status===409 ? msgRunAlready : msgRunPolling);
+    }
   }catch(e){ o.textContent=String(e); }
 }
+(function(){
+  const root = document.body;
+  if(root && root.getAttribute('data-running')==='true'){
+    enterRunningMode(msgRunPolling);
+  }
+})();
 renderTimes();
 </script>
 </body></html>`,
 		html.EscapeString(string(lang)),
 		html.EscapeString(t("title")),
+		runningAttr,
 		html.EscapeString(t("subtitle")),
 		langActive(lang, LangZhHant), html.EscapeString(t("lang_zh")),
 		langActive(lang, LangEn), html.EscapeString(t("lang_en")),
 		langActive(lang, LangJa), html.EscapeString(t("lang_ja")),
 		statusPillClass(st.Enabled),
 		html.EscapeString(enabled), html.EscapeString(st.Version),
+		runningBadgeHidden, html.EscapeString(t("running_label")),
 		html.EscapeString(t("rail_now")),
 		html.EscapeString(t("next_run")), html.EscapeString(railNext),
 		html.EscapeString(t("rail_whitelist")), selectedN, len(st.Accounts),
@@ -1132,6 +1197,7 @@ renderTimes();
 		html.EscapeString(t("rail_key")),
 		html.EscapeString(t("key_placeholder")),
 		html.EscapeString(t("save")),
+		runDisabled,
 		html.EscapeString(t("run_now")),
 		html.EscapeString(t("refresh")),
 		html.EscapeString(t("actions_hint")),
@@ -1174,6 +1240,7 @@ renderTimes();
 		html.EscapeString(t("run_history_title")),
 		html.EscapeString(t("last_run_empty_title")),
 		html.EscapeString(t("last_run_empty_body")),
+		runDisabled,
 		html.EscapeString(t("run_now")),
 		string(timesJSON),
 		string(accountTimesJSON),
@@ -1191,6 +1258,8 @@ renderTimes();
 		needKey,
 		saving,
 		starting,
+		runPolling,
+		runAlready,
 	)
 }
 
