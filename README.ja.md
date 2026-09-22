@@ -48,7 +48,7 @@ plugins:
 ストアは GitHub Release の zip をプラグインディレクトリ（多くは `plugins/`）へ展開します:
 
 ```text
-codex-selective-ping_0.2.3_linux_amd64.zip
+codex-selective-ping_0.2.4_linux_amd64.zip
 └── codex-selective-ping.so
 ```
 
