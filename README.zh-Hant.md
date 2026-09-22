@@ -75,6 +75,7 @@ plugins:
         - "16:00"
         - "21:00"
       history_limit: 60
+      retry_count: 2
       accounts:
         - "user@example.com"
         - "auth_index_or_name"
@@ -111,6 +112,7 @@ cp package/codex-selective-ping.so /path/to/cpa/plugins/
 | `accounts` | string[] | 白名單：`auth_index`（精確）或 email／name／account（不分大小寫）。空 → 0 次 ping |
 | `data_dir` | string | 可選。`run_history.json` 所在目錄（相對路徑相對 CPA cwd） |
 | `history_limit` | int | 最多保留幾筆執行紀錄（預設 **60**；≤0 視為 60） |
+| `retry_count` | int | 若結果為 **limited**／額度不足，再重試幾次，每次間隔 **60 秒**（預設 **2**；`0` 關閉）。非 limited 失敗不走此重試。 |
 | `state_path` | string | 可選。上次執行檔完整路徑（優先於 `data_dir`） |
 
 預設上次執行路徑：`{CPA 根目錄}/data/codex-selective-ping/run_history.json`（`plugins/` 上一層）。

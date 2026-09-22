@@ -17,7 +17,8 @@ type Config struct {
 	Accounts  []string `json:"accounts"`
 	DataDir      string `json:"data_dir,omitempty"`
 	StatePath    string `json:"state_path,omitempty"`
-	HistoryLimit int    `json:"history_limit,omitempty"`
+	HistoryLimit int `json:"history_limit,omitempty"`
+	RetryCount   int `json:"retry_count,omitempty"`
 }
 
 func DefaultConfig() Config {
@@ -27,6 +28,7 @@ func DefaultConfig() Config {
 		Times:        append([]string(nil), defaultTimes...),
 		Accounts:     []string{},
 		HistoryLimit: 60,
+		RetryCount:   2,
 	}
 }
 
@@ -45,6 +47,7 @@ func Parse(raw string) (Config, error) {
 			DataDir         string `json:"data_dir"`
 			StatePath       string `json:"state_path"`
 			HistoryLimit    *int   `json:"history_limit"`
+			RetryCount      *int   `json:"retry_count"`
 		}
 		if err := json.Unmarshal([]byte(text), &p); err != nil {
 			return Config{}, fmt.Errorf("invalid JSON config: %w", err)
@@ -70,6 +73,9 @@ func Parse(raw string) (Config, error) {
 		}
 		if p.HistoryLimit != nil {
 			cfg.HistoryLimit = *p.HistoryLimit
+		}
+		if p.RetryCount != nil {
+			cfg.RetryCount = *p.RetryCount
 		}
 		return Validate(cfg)
 	}
@@ -145,6 +151,14 @@ func parseYAMLSubset(text string, cfg Config) (Config, error) {
 				}
 				cfg.HistoryLimit = n
 			}
+		case "retry_count":
+			if value != "" {
+				n, err := strconv.Atoi(unquote(value))
+				if err != nil {
+					return Config{}, fmt.Errorf("retry_count must be an integer")
+				}
+				cfg.RetryCount = n
+			}
 		}
 	}
 	if times != nil {
@@ -194,6 +208,9 @@ func Validate(cfg Config) (Config, error) {
 	cfg.StatePath = strings.TrimSpace(cfg.StatePath)
 	if cfg.HistoryLimit <= 0 {
 		cfg.HistoryLimit = 60
+	}
+	if cfg.RetryCount < 0 {
+		cfg.RetryCount = 0
 	}
 	return cfg, nil
 }

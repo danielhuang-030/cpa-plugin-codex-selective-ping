@@ -75,6 +75,7 @@ plugins:
         - "16:00"
         - "21:00"
       history_limit: 60
+      retry_count: 2
       accounts:
         - "user@example.com"
         - "auth_index_or_name"
@@ -111,6 +112,7 @@ cp package/codex-selective-ping.so /path/to/cpa/plugins/
 | `accounts` | string[] | 許可リスト。`auth_index`（完全一致）または email / name / account（大文字小文字無視）。空 → ping 0 回 |
 | `data_dir` | string | 任意。`run_history.json` のディレクトリ（相対パスは CPA cwd 基準） |
 | `history_limit` | int | 保持する実行履歴の上限（既定 **60**；≤0 は 60） |
+| `retry_count` | int | **limited**／クォータ失敗時に、何回追加で再試行するか。間隔は固定 **60 秒**（既定 **2**；`0` で無効）。limited 以外はこの経路で再試行しません。 |
 | `state_path` | string | 任意。直近実行ファイルのフルパス（`data_dir` より優先） |
 
 既定の直近実行パス: `{CPA ルート}/data/codex-selective-ping/run_history.json`（`plugins/` の親）。

@@ -20,6 +20,7 @@ func configFields(cfg config.Config) []map[string]any {
 		{"Name": "data_dir", "Type": "string", "Description": "Optional directory for run_history.json (default: {CPA root}/data/codex-selective-ping)", "DefaultValue": ""},
 		{"Name": "state_path", "Type": "string", "Description": "Optional full path to run_history.json (overrides data_dir)", "DefaultValue": ""},
 		{"Name": "history_limit", "Type": "int", "Description": "Max persisted run history entries (default 60)", "DefaultValue": cfg.HistoryLimit},
+		{"Name": "retry_count", "Type": "int", "Description": "On limited/quota failure, retry this many times after the first attempt, waiting 60s between tries (default 2)", "DefaultValue": cfg.RetryCount},
 	}
 }
 

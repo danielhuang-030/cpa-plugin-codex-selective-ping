@@ -8,7 +8,6 @@ import (
 
 	"cpa-plugin-codex-selective-ping/internal/config"
 	"cpa-plugin-codex-selective-ping/internal/hostapi"
-	"cpa-plugin-codex-selective-ping/internal/pinger"
 	"cpa-plugin-codex-selective-ping/internal/runstate"
 	"cpa-plugin-codex-selective-ping/internal/selector"
 )
@@ -91,7 +90,7 @@ func (r *Runner) RunClaimed(parent context.Context, cfg config.Config, force boo
 		go func(auth hostapi.AuthFile) {
 			defer wg.Done()
 			mem := r.State.GetAccount(auth.AuthIndex)
-			out := pinger.PingAccount(ctx, r.Host, auth, force, mem.LastSuccess)
+			out := pingWithLimitedRetry(ctx, r.Host, auth, force, mem.LastSuccess, cfg.RetryCount, nil, nil)
 			res := runstate.AccountResult{
 				AuthIndex: auth.AuthIndex, Name: nameOf(auth), Email: auth.Email, Unavailable: auth.Unavailable,
 				Status: out.Status, Attempts: out.Attempts, HTTPStatus: out.HTTPStatus, Error: out.Error,

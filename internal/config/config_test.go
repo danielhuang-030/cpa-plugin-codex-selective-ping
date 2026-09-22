@@ -212,3 +212,67 @@ func TestParseOmitsHistoryLimitDefaultsTo60(t *testing.T) {
 		t.Fatalf("HistoryLimit=%d want 60", cfg.HistoryLimit)
 	}
 }
+
+
+func TestDefaultConfigRetryCount(t *testing.T) {
+	cfg := DefaultConfig()
+	if cfg.RetryCount != 2 {
+		t.Fatalf("RetryCount default=%d want 2", cfg.RetryCount)
+	}
+}
+
+func TestParseJSONRetryCount(t *testing.T) {
+	cfg, err := Parse(`{"schedule_enabled":true,"timezone":"UTC","times":["06:00"],"retry_count":5}`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.RetryCount != 5 {
+		t.Fatalf("RetryCount=%d want 5", cfg.RetryCount)
+	}
+}
+
+func TestParseYAMLRetryCount(t *testing.T) {
+	raw := `
+schedule_enabled: true
+timezone: UTC
+times: ["06:00"]
+retry_count: 1
+`
+	cfg, err := Parse(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.RetryCount != 1 {
+		t.Fatalf("RetryCount=%d want 1", cfg.RetryCount)
+	}
+}
+
+func TestParseRetryCountZeroDisablesOuterRetry(t *testing.T) {
+	cfg, err := Parse(`{"schedule_enabled":true,"timezone":"UTC","times":["06:00"],"retry_count":0}`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.RetryCount != 0 {
+		t.Fatalf("RetryCount=%d want 0", cfg.RetryCount)
+	}
+}
+
+func TestParseRetryCountNegativeClampsToZero(t *testing.T) {
+	cfg, err := Parse(`{"schedule_enabled":true,"timezone":"UTC","times":["06:00"],"retry_count":-2}`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.RetryCount != 0 {
+		t.Fatalf("RetryCount=%d want 0", cfg.RetryCount)
+	}
+}
+
+func TestParseOmitsRetryCountDefaultsTo2(t *testing.T) {
+	cfg, err := Parse(`{"schedule_enabled":true,"timezone":"UTC","times":["06:00"]}`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.RetryCount != 2 {
+		t.Fatalf("RetryCount=%d want 2", cfg.RetryCount)
+	}
+}

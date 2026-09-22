@@ -75,6 +75,7 @@ plugins:
         - "16:00"
         - "21:00"
       history_limit: 60
+      retry_count: 2
       accounts:
         - "user@example.com"
         - "auth_index_or_name"
@@ -111,11 +112,14 @@ Then apply the `plugins.configs.codex-selective-ping` block above and restart CP
 | `accounts` | string[] | Allowlist: `auth_index` (exact) or email / name / account (case-insensitive). Empty → 0 pings |
 | `data_dir` | string | Optional. Directory for `run_history.json` (relative → CPA cwd) |
 | `history_limit` | int | Max stored runs (default **60**; ≤0 treated as 60) |
+| `retry_count` | int | After a **limited**/quota failure, retry this many more times waiting **60s** between tries (default **2**; `0` disables). Non-limited failures are not retried this way. |
 | `state_path` | string | Optional. Full path to the last-run file (wins over `data_dir`) |
 
 Run history is stored newest-first in `run_history.json` (default under `{CPA root}/data/codex-selective-ping/`). A legacy single-object `last_run.json` in the same directory is migrated once and then deleted.
 
 Default history path: `{CPA root}/data/codex-selective-ping/run_history.json` (parent of `plugins/`).
+
+On **limited** (quota) failures, the runner waits **60 seconds** and retries up to `retry_count` more times (default 2).
 
 ## Management
 
