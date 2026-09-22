@@ -218,7 +218,7 @@ func TestLastRunChipsTranslated(t *testing.T) {
 func TestV4DataI18nKeysPresentInAllLangs(t *testing.T) {
 	keys := []string{
 		"rhythm_title", "rhythm_sub", "slot_next", "slot_past", "slot_next_inherit",
-		"how_title", "how_body", "how_global_off", "how_global_off_v", "how_manual", "how_manual_v", "how_quota_removed", "how_quota_removed_v",
+		"how_title", "how_body", "how_global_off", "how_global_off_v", "how_manual", "how_manual_v",
 		"accounts_who_title", "accounts_times_sub",
 		"accounts_empty_heading", "accounts_empty_title", "accounts_empty_body", "accounts_empty_cta",
 		"filter_all", "filter_selected", "filter_custom",

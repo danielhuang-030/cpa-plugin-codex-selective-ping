@@ -1064,3 +1064,109 @@ func TestRenderStatusPageRunningButtonJSLabelToggle(t *testing.T) {
 		t.Fatal("JS must query [data-run-now] buttons")
 	}
 }
+
+func TestPrinciplesHowBlockOmitsQuotaRemovedRow(t *testing.T) {
+	html := RenderStatusPage(StatusResponse{
+		Enabled:  true,
+		Version:  "0.2.3",
+		Timezone: "Asia/Taipei",
+		Times:    []string{"21:00"},
+	}, LangZhHant)
+	sec := strings.Index(html, `id="sec-principles"`)
+	if sec < 0 {
+		t.Fatal("missing sec-principles")
+	}
+	chunk := html[sec:]
+	if end := strings.Index(chunk, `id="sec-accounts`); end > 0 {
+		chunk = chunk[:end]
+	}
+	for _, ban := range []string{
+		`how_quota_removed`,
+		`data-i18n="how_quota_removed"`,
+		`how_quota_removed_v`,
+		`data-i18n="how_quota_removed_v"`,
+		"額度欄",
+		"已從帳號卡移除",
+	} {
+		if strings.Contains(chunk, ban) {
+			t.Fatalf("principles/how block must not contain %q; chunk=%q", ban, chunk)
+		}
+	}
+	// Still keep the other how metrics.
+	for _, want := range []string{`data-i18n="how_global_off"`, `data-i18n="how_manual"`, `data-i18n="how_title"`} {
+		if !strings.Contains(chunk, want) {
+			t.Fatalf("principles/how block missing %q; chunk=%q", want, chunk)
+		}
+	}
+}
+
+func TestRenderStatusPageModelSelect(t *testing.T) {
+	html := RenderStatusPage(StatusResponse{
+		Enabled: true, Version: "0.2.3", Model: "gpt-5.6-luna",
+		Timezone: "Asia/Taipei", Times: []string{"21:00"},
+	}, LangZhHant)
+	if !strings.Contains(html, `data-testid="model-select"`) && !strings.Contains(html, `id="model-select"`) {
+		t.Fatal(`rail must render model <select> with data-testid="model-select" or id="model-select"`)
+	}
+	if !strings.Contains(html, `id="model-select"`) {
+		t.Fatal(`missing id="model-select"`)
+	}
+	if !strings.Contains(html, `value="gpt-5.6-luna"`) {
+		t.Fatal("model select must preload current effective model as an option")
+	}
+	// Must not leave the old static value span for the rail model row.
+	if strings.Contains(html, `data-i18n="rail_model"`) {
+		idx := strings.Index(html, `data-i18n="rail_model"`)
+		chunk := html[idx:]
+		if end := strings.Index(chunk, `</div>`); end > 0 {
+			chunk = chunk[:end]
+		}
+		if strings.Contains(chunk, `<span class="v">`) {
+			t.Fatalf("rail model value must be a <select>, not span.v; chunk=%q", chunk)
+		}
+		if !strings.Contains(chunk, "<select") {
+			t.Fatalf("rail model row must contain <select>; chunk=%q", chunk)
+		}
+	}
+}
+
+func TestRenderStatusPageModelSelectFetchAndFilterJS(t *testing.T) {
+	html := RenderStatusPage(StatusResponse{
+		Enabled: true, Model: "gpt-5.6-luna", Times: []string{"21:00"},
+	}, LangEn)
+	if !strings.Contains(html, `'/v1/models'`) && !strings.Contains(html, `"/v1/models"`) {
+		t.Fatal("JS must fetch /v1/models")
+	}
+	if !strings.Contains(html, "keepModel") {
+		t.Fatal("JS must define keepModel mirroring modelfilter.Keep")
+	}
+	if !strings.Contains(html, "sync with internal/modelfilter.Keep") {
+		t.Fatal(`JS must comment // sync with internal/modelfilter.Keep`)
+	}
+	for _, needle := range []string{"codex", "openai", "chatgpt", "gpt-"} {
+		if !strings.Contains(html, needle) {
+			t.Fatalf("keepModel heuristics missing %q", needle)
+		}
+	}
+}
+
+func TestRenderStatusPageSaveCfgIncludesModel(t *testing.T) {
+	html := RenderStatusPage(StatusResponse{
+		Enabled: true, Model: "gpt-5", Times: []string{"21:00"},
+	}, LangEn)
+	idx := strings.Index(html, "async function saveCfg()")
+	if idx < 0 {
+		t.Fatal("missing saveCfg")
+	}
+	end := idx + 1200
+	if end > len(html) {
+		end = len(html)
+	}
+	chunk := html[idx:end]
+	if !strings.Contains(chunk, "model") {
+		t.Fatalf("saveCfg body must include model; chunk=%q", chunk[:min(300, len(chunk))])
+	}
+	if !strings.Contains(chunk, "model-select") {
+		t.Fatal("saveCfg must read model from #model-select")
+	}
+}

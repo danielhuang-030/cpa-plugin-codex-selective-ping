@@ -10,7 +10,7 @@ A [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) (CPA) plugin that 
 ## Features
 
 - **Allowlist only** — pings `accounts`; empty list → 0 attempts
-- **Fixed model** — `gpt-5.6-luna` (not configurable)
+- **Selectable model** — optional config `model`; empty → fallback `gpt-5.6-luna`
 - **Daily schedule** — IANA timezone + global `times`; optional per-account `account_times`; does not ping on CPA startup
 - **Management UI** — Traditional Chinese / English / Japanese (follows CPA Management Center; override with `?lang=` / `?theme=`); per-account inherit/custom schedule; expandable run history by account
 - **Persisted last run** — `{CPA root}/data/codex-selective-ping/run_history.json` (never under `auth-dir` / `auths/`)
@@ -76,6 +76,7 @@ plugins:
         - "21:00"
       history_limit: 60
       retry_count: 2
+      model: gpt-5.6-luna
       accounts:
         - "alice@example.com"
         - "bob@example.com"
@@ -120,6 +121,7 @@ Then apply the `plugins.configs.codex-selective-ping` block above and restart CP
 | `data_dir` | string | Optional. Directory for `run_history.json` (relative → CPA cwd) |
 | `history_limit` | int | Max stored runs (default **60**; ≤0 treated as 60) |
 | `retry_count` | int | After a **limited**/quota failure, retry this many more times waiting **60s** between tries (default **2**; `0` disables). Non-limited failures are not retried this way. |
+| `model` | string | Optional. Codex model id used for pings. Empty / omitted → fallback `gpt-5.6-luna` |
 | `state_path` | string | Optional. Full path to the last-run file (wins over `data_dir`) |
 
 **Schedule behavior:** the scheduler waits on the **union** of every allowlisted account’s effective times (custom if non-empty, else global `times`). At each fire `HH:MM`, only accounts whose effective times contain that slot are pinged. Manual / **Run now** still targets the full allowlist and is recorded in history (`force`).

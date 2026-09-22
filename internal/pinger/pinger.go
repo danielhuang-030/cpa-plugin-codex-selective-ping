@@ -65,7 +65,7 @@ type upstreamErrorEnvelope struct {
 	} `json:"error"`
 }
 
-func PingAccount(ctx context.Context, h hostapi.Host, a hostapi.AuthFile, force bool, lastSuccess time.Time) Outcome {
+func PingAccount(ctx context.Context, h hostapi.Host, a hostapi.AuthFile, force bool, lastSuccess time.Time, model string) Outcome {
 	base := Outcome{}
 	if !force && !lastSuccess.IsZero() {
 		eligible := lastSuccess.Add(WindowInterval + WindowGuard)
@@ -92,7 +92,7 @@ func PingAccount(ctx context.Context, h hostapi.Host, a hostapi.AuthFile, force 
 	for attempt := 1; attempt <= MaxAttempts; attempt++ {
 		base.Attempts = attempt
 		attemptCtx, cancel := context.WithTimeout(ctx, AttemptTimeout)
-		out := pingOnce(attemptCtx, h, a)
+		out := pingOnce(attemptCtx, h, a, model)
 		cancel()
 		base.HTTPStatus = out.HTTPStatus
 		base.Error = out.Error
@@ -125,7 +125,7 @@ func PingAccount(ctx context.Context, h hostapi.Host, a hostapi.AuthFile, force 
 	return base
 }
 
-func pingOnce(ctx context.Context, h hostapi.Host, a hostapi.AuthFile) Outcome {
+func pingOnce(ctx context.Context, h hostapi.Host, a hostapi.AuthFile, model string) Outcome {
 	raw, err := h.AuthGet(ctx, a.AuthIndex)
 	if err != nil {
 		return Outcome{Status: "failed", Retryable: true, Error: "auth get: " + err.Error()}
@@ -135,7 +135,7 @@ func pingOnce(ctx context.Context, h hostapi.Host, a hostapi.AuthFile) Outcome {
 		return Outcome{Status: "failed", Retryable: false, Error: err.Error()}
 	}
 	body, _ := json.Marshal(codexBody{
-		Model:        ModelName,
+		Model:        model,
 		Instructions: "You are a helpful assistant.",
 		Input:        []codexMessage{{Type: "message", Role: "user", Content: []codexPart{{Type: "input_text", Text: DefaultPrompt}}}},
 		Store:        false,

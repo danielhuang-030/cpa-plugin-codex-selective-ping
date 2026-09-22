@@ -11,7 +11,7 @@ import (
 const LimitedRetryInterval = time.Minute
 
 // pingFn is overridable in tests.
-type pingFn func(ctx context.Context, h hostapi.Host, a hostapi.AuthFile, force bool, lastSuccess time.Time) pinger.Outcome
+type pingFn func(ctx context.Context, h hostapi.Host, a hostapi.AuthFile, force bool, lastSuccess time.Time, model string) pinger.Outcome
 
 // sleepFn is overridable in tests (production uses ctx-aware sleep).
 type sleepFn func(ctx context.Context, d time.Duration) error
@@ -36,6 +36,7 @@ func pingWithLimitedRetry(
 	force bool,
 	lastSuccess time.Time,
 	retryCount int,
+	model string,
 	ping pingFn,
 	sleep sleepFn,
 ) pinger.Outcome {
@@ -57,7 +58,7 @@ func pingWithLimitedRetry(
 				return out
 			}
 		}
-		out = ping(ctx, h, a, force, lastSuccess)
+		out = ping(ctx, h, a, force, lastSuccess, model)
 		if out.Status != "limited" {
 			return out
 		}

@@ -12,7 +12,7 @@ import (
 func TestPingWithLimitedRetrySuccessAfterOneWait(t *testing.T) {
 	calls := 0
 	var sleeps []time.Duration
-	ping := func(ctx context.Context, h hostapi.Host, a hostapi.AuthFile, force bool, lastSuccess time.Time) pinger.Outcome {
+	ping := func(ctx context.Context, h hostapi.Host, a hostapi.AuthFile, force bool, lastSuccess time.Time, model string) pinger.Outcome {
 		calls++
 		if calls == 1 {
 			return pinger.Outcome{Status: "limited", Attempts: 1, Error: "quota"}
@@ -23,7 +23,7 @@ func TestPingWithLimitedRetrySuccessAfterOneWait(t *testing.T) {
 		sleeps = append(sleeps, d)
 		return nil
 	}
-	out := pingWithLimitedRetry(context.Background(), nil, hostapi.AuthFile{AuthIndex: "1"}, true, time.Time{}, 2, ping, sleep)
+	out := pingWithLimitedRetry(context.Background(), nil, hostapi.AuthFile{AuthIndex: "1"}, true, time.Time{}, 2, "", ping, sleep)
 	if out.Status != "success" {
 		t.Fatalf("status=%q", out.Status)
 	}
@@ -38,7 +38,7 @@ func TestPingWithLimitedRetrySuccessAfterOneWait(t *testing.T) {
 func TestPingWithLimitedRetryExhaustsCount(t *testing.T) {
 	calls := 0
 	var sleeps []time.Duration
-	ping := func(ctx context.Context, h hostapi.Host, a hostapi.AuthFile, force bool, lastSuccess time.Time) pinger.Outcome {
+	ping := func(ctx context.Context, h hostapi.Host, a hostapi.AuthFile, force bool, lastSuccess time.Time, model string) pinger.Outcome {
 		calls++
 		return pinger.Outcome{Status: "limited", Attempts: 1, Error: "quota"}
 	}
@@ -46,7 +46,7 @@ func TestPingWithLimitedRetryExhaustsCount(t *testing.T) {
 		sleeps = append(sleeps, d)
 		return nil
 	}
-	out := pingWithLimitedRetry(context.Background(), nil, hostapi.AuthFile{}, true, time.Time{}, 2, ping, sleep)
+	out := pingWithLimitedRetry(context.Background(), nil, hostapi.AuthFile{}, true, time.Time{}, 2, "", ping, sleep)
 	if out.Status != "limited" {
 		t.Fatalf("status=%q", out.Status)
 	}
@@ -60,7 +60,7 @@ func TestPingWithLimitedRetryExhaustsCount(t *testing.T) {
 
 func TestPingWithLimitedRetryZeroMeansNoRetry(t *testing.T) {
 	calls := 0
-	ping := func(ctx context.Context, h hostapi.Host, a hostapi.AuthFile, force bool, lastSuccess time.Time) pinger.Outcome {
+	ping := func(ctx context.Context, h hostapi.Host, a hostapi.AuthFile, force bool, lastSuccess time.Time, model string) pinger.Outcome {
 		calls++
 		return pinger.Outcome{Status: "limited", Attempts: 1}
 	}
@@ -68,7 +68,7 @@ func TestPingWithLimitedRetryZeroMeansNoRetry(t *testing.T) {
 		t.Fatal("should not sleep")
 		return nil
 	}
-	out := pingWithLimitedRetry(context.Background(), nil, hostapi.AuthFile{}, true, time.Time{}, 0, ping, sleep)
+	out := pingWithLimitedRetry(context.Background(), nil, hostapi.AuthFile{}, true, time.Time{}, 0, "", ping, sleep)
 	if out.Status != "limited" || calls != 1 {
 		t.Fatalf("status=%q calls=%d", out.Status, calls)
 	}
@@ -76,7 +76,7 @@ func TestPingWithLimitedRetryZeroMeansNoRetry(t *testing.T) {
 
 func TestPingWithLimitedRetryNonLimitedNoOuterRetry(t *testing.T) {
 	calls := 0
-	ping := func(ctx context.Context, h hostapi.Host, a hostapi.AuthFile, force bool, lastSuccess time.Time) pinger.Outcome {
+	ping := func(ctx context.Context, h hostapi.Host, a hostapi.AuthFile, force bool, lastSuccess time.Time, model string) pinger.Outcome {
 		calls++
 		return pinger.Outcome{Status: "failed", Attempts: 3, Error: "boom", Retryable: true}
 	}
@@ -84,7 +84,7 @@ func TestPingWithLimitedRetryNonLimitedNoOuterRetry(t *testing.T) {
 		t.Fatal("should not sleep for non-limited")
 		return nil
 	}
-	out := pingWithLimitedRetry(context.Background(), nil, hostapi.AuthFile{}, true, time.Time{}, 2, ping, sleep)
+	out := pingWithLimitedRetry(context.Background(), nil, hostapi.AuthFile{}, true, time.Time{}, 2, "", ping, sleep)
 	if out.Status != "failed" || calls != 1 {
 		t.Fatalf("status=%q calls=%d", out.Status, calls)
 	}
@@ -92,7 +92,7 @@ func TestPingWithLimitedRetryNonLimitedNoOuterRetry(t *testing.T) {
 
 func TestPingWithLimitedRetryContextCancelDuringSleep(t *testing.T) {
 	calls := 0
-	ping := func(ctx context.Context, h hostapi.Host, a hostapi.AuthFile, force bool, lastSuccess time.Time) pinger.Outcome {
+	ping := func(ctx context.Context, h hostapi.Host, a hostapi.AuthFile, force bool, lastSuccess time.Time, model string) pinger.Outcome {
 		calls++
 		return pinger.Outcome{Status: "limited", Attempts: 1}
 	}
@@ -101,7 +101,7 @@ func TestPingWithLimitedRetryContextCancelDuringSleep(t *testing.T) {
 		cancel()
 		return ctx.Err()
 	}
-	out := pingWithLimitedRetry(ctx, nil, hostapi.AuthFile{}, true, time.Time{}, 2, ping, sleep)
+	out := pingWithLimitedRetry(ctx, nil, hostapi.AuthFile{}, true, time.Time{}, 2, "", ping, sleep)
 	if out.Status != "failed" {
 		t.Fatalf("status=%q want failed", out.Status)
 	}
