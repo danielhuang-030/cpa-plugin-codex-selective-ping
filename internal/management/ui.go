@@ -577,6 +577,21 @@ func RenderStatusPage(st StatusResponse, lang Lang) string {
   .chip.ok { background: var(--ok-bg); color: var(--ok) }
   .chip.warn { background: var(--warn-bg); color: var(--warn) }
   .chip.bad { background: var(--bad-bg); color: var(--bad) }
+  .running-banner {
+    display:flex; flex-direction:column; gap:4px;
+    margin: 10px 0 4px;
+    padding: 12px 14px;
+    border-radius: 14px;
+    background: var(--warn-bg);
+    color: var(--warn);
+    border: 1px solid color-mix(in srgb, var(--warn) 35%%, var(--line));
+    font-family: var(--ui);
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.35;
+  }
+  .running-banner strong { font-size: 14px; letter-spacing: .02em; }
+  .running-banner[hidden] { display:none !important; }
   .run {
     display:grid; grid-template-columns: 170px 1fr; gap: 14px;
   }
@@ -634,6 +649,10 @@ func RenderStatusPage(st StatusResponse, lang Lang) string {
   </nav>
   <div class="status-pill %s"><i></i> %s · v%s</div>
   <span id="running-badge" class="chip warn" data-i18n="running_label"%s>%s</span>
+  <div id="running-banner" class="running-banner" data-testid="running-banner"%s>
+    <strong data-i18n="running_label">%s</strong>
+    <span data-i18n="run_polling">%s</span>
+  </div>
   <div class="rail-block">
     <h3 data-i18n="rail_now">%s</h3>
     <div class="metric"><span class="k" data-i18n="next_run">%s</span><span class="v">%s</span></div>
@@ -1108,7 +1127,27 @@ function collectAccountTimes(){
   });
   return out;
 }
-function key(){ return document.getElementById('management-key').value.trim(); }
+const KEY_STORAGE='codex-selective-ping:management-key';
+function restoreKeyFromSession(){
+  const el=document.getElementById('management-key');
+  if(!el || el.value.trim()) return;
+  try{
+    const v=sessionStorage.getItem(KEY_STORAGE);
+    if(v) el.value=v;
+  }catch(e){}
+}
+function persistKeyIfPresent(){
+  const el=document.getElementById('management-key');
+  const v=el ? el.value.trim() : '';
+  if(!v) return;
+  try{ sessionStorage.setItem(KEY_STORAGE, v); }catch(e){}
+}
+function key(){
+  restoreKeyFromSession();
+  const v=document.getElementById('management-key').value.trim();
+  if(v) persistKeyIfPresent();
+  return v;
+}
 async function saveCfg(){
   const o=document.getElementById('result'); const k=key();
   if(!k){ o.textContent=msgNeedKey; return; }
@@ -1127,6 +1166,8 @@ function setRunButtonsDisabled(on){
 function showRunningBadge(on){
   const el = document.getElementById('running-badge');
   if(el){ el.hidden = !on; }
+  const banner = document.getElementById('running-banner');
+  if(banner){ banner.hidden = !on; }
 }
 function enterRunningMode(msg){
   setRunButtonsDisabled(true);
@@ -1171,6 +1212,7 @@ async function runNow(){
   }catch(e){ o.textContent=String(e); }
 }
 (function(){
+  restoreKeyFromSession();
   const root = document.body;
   if(root && root.getAttribute('data-running')==='true'){
     enterRunningMode(msgRunPolling);
@@ -1189,6 +1231,7 @@ renderTimes();
 		statusPillClass(st.Enabled),
 		html.EscapeString(enabled), html.EscapeString(st.Version),
 		runningBadgeHidden, html.EscapeString(t("running_label")),
+		runningBadgeHidden, html.EscapeString(t("running_label")), html.EscapeString(t("run_polling")),
 		html.EscapeString(t("rail_now")),
 		html.EscapeString(t("next_run")), html.EscapeString(railNext),
 		html.EscapeString(t("rail_whitelist")), selectedN, len(st.Accounts),

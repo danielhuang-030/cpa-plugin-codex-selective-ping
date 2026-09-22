@@ -29,8 +29,8 @@ func TestRenderStatusPageChineseAndQuotaDash(t *testing.T) {
 	if !strings.Contains(html, `type="password"`) {
 		t.Fatal("Management Key field must be type=password")
 	}
-	if !strings.Contains(html, "不持久化") {
-		t.Fatal("zh-Hant page must note key is not persisted")
+	if !strings.Contains(html, "同分頁暫存") {
+		t.Fatal("zh-Hant page must note key is kept for this tab only")
 	}
 }
 
@@ -827,5 +827,92 @@ func TestRenderStatusPageRunNowPollsStatusNotFixedReload(t *testing.T) {
 	}
 	if !strings.Contains(html, "function runNow") && !strings.Contains(html, "async function runNow") {
 		t.Fatal("expected runNow function")
+	}
+}
+
+func TestRenderStatusPageSessionStorageManagementKey(t *testing.T) {
+	html := RenderStatusPage(StatusResponse{Version: "0.1.9"}, LangZhHant)
+	const storageKey = "codex-selective-ping:management-key"
+	for _, want := range []string{
+		"sessionStorage.setItem",
+		"sessionStorage.getItem",
+		storageKey,
+	} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("missing sessionStorage marker %q", want)
+		}
+	}
+	if strings.Contains(html, "localStorage.setItem") {
+		t.Fatal("must not persist Management Key via localStorage.setItem")
+	}
+	// key() / bootstrap must restore before poll so running reload does not false-need_key
+	for _, want := range []string{
+		"function key(",
+		"function restoreKeyFromSession",
+		"function persistKeyIfPresent",
+	} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("missing key helper %q", want)
+		}
+	}
+	bootMarker := `getAttribute('data-running')==='true'`
+	bootIdx := strings.Index(html, bootMarker)
+	if bootIdx < 0 {
+		t.Fatal("missing data-running bootstrap")
+	}
+	start := bootIdx - 240
+	if start < 0 {
+		start = 0
+	}
+	pre := html[start:bootIdx]
+	if !strings.Contains(pre, "restoreKeyFromSession()") {
+		t.Fatal("restoreKeyFromSession must be called before data-running bootstrap poll")
+	}
+}
+
+func TestRenderStatusPageRunningBanner(t *testing.T) {
+	htmlOn := RenderStatusPage(StatusResponse{Running: true, Version: "0.1.9"}, LangZhHant)
+	if !strings.Contains(htmlOn, `id="running-banner"`) && !strings.Contains(htmlOn, `data-testid="running-banner"`) {
+		t.Fatal("expected #running-banner or data-testid=running-banner")
+	}
+	bannerIdx := strings.Index(htmlOn, `id="running-banner"`)
+	if bannerIdx < 0 {
+		bannerIdx = strings.Index(htmlOn, `data-testid="running-banner"`)
+	}
+	end := strings.Index(htmlOn[bannerIdx:], ">")
+	if end < 0 {
+		t.Fatal("running-banner tag not closed")
+	}
+	tag := htmlOn[bannerIdx : bannerIdx+end+1]
+	if strings.Contains(tag, "hidden") {
+		t.Fatalf("running banner must not be hidden when Running=true; tag=%q", tag)
+	}
+	// Must include running label / polling hint content
+	if !strings.Contains(htmlOn, `data-i18n="running_label"`) {
+		t.Fatal("banner/badge should use running_label")
+	}
+	if !strings.Contains(htmlOn, `data-i18n="run_polling"`) && !strings.Contains(htmlOn, "執行中，完成後會自動更新") {
+		t.Fatal("banner should surface run_polling hint when running")
+	}
+
+	htmlOff := RenderStatusPage(StatusResponse{Running: false, Version: "0.1.9"}, LangZhHant)
+	bannerIdx = strings.Index(htmlOff, `id="running-banner"`)
+	if bannerIdx < 0 {
+		t.Fatal("expected #running-banner even when not running (hidden)")
+	}
+	end = strings.Index(htmlOff[bannerIdx:], ">")
+	if end < 0 {
+		t.Fatal("running-banner tag not closed (off)")
+	}
+	tag = htmlOff[bannerIdx : bannerIdx+end+1]
+	if !strings.Contains(tag, "hidden") {
+		t.Fatalf("running banner must be hidden when Running=false; tag=%q", tag)
+	}
+	// showRunningBadge / setRunningUI must toggle banner too
+	if !strings.Contains(htmlOff, "running-banner") {
+		t.Fatal("JS/HTML must reference running-banner")
+	}
+	if !strings.Contains(htmlOff, "showRunningBadge") && !strings.Contains(htmlOff, "setRunningUI") {
+		t.Fatal("expected showRunningBadge or setRunningUI to control running UI")
 	}
 }
