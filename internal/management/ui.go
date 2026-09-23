@@ -488,10 +488,18 @@ func RenderStatusPage(st StatusResponse, lang Lang) string {
   .metric:last-child { border-bottom: 0 }
   .metric .k { color: var(--ink-soft); font-size: 12px }
   .metric .v { font-weight: 700; font-size: 14px }
-  .metric.metric-model { align-items: center; gap: 8px; flex-wrap: wrap }
-  .metric.metric-model #refresh-models { flex: 0 0 auto; padding: 6px 10px; font-size: 12px }
+  .metric.metric-model {
+    display: flex; flex-direction: column; align-items: stretch; gap: 8px;
+  }
+  .metric-model-top {
+    display: flex; justify-content: space-between; align-items: center;
+    gap: 8px; width: 100%%;
+  }
+  .metric.metric-model #refresh-models {
+    flex: 0 0 auto; white-space: nowrap; padding: 6px 10px; font-size: 12px;
+  }
   #model-select {
-    max-width: 58%%; min-width: 0;
+    width: 100%%; min-width: 0;
     font: inherit; font-weight: 700; font-size: 13px;
     border: 1px solid var(--line); border-radius: 8px;
     background: var(--panel-2); color: var(--ink);
@@ -705,7 +713,7 @@ func RenderStatusPage(st StatusResponse, lang Lang) string {
     <h3 data-i18n="rail_now">%s</h3>
     <div class="metric"><span class="k" data-i18n="next_run">%s</span><span class="v">%s</span></div>
     <div class="metric"><span class="k" data-i18n="rail_whitelist">%s</span><span class="v">%d / %d</span></div>
-    <div class="metric metric-model"><span class="k" data-i18n="rail_model">%s</span><select id="model-select" class="v" data-testid="model-select"><option value="%s" selected>%s</option></select><button type="button" class="btn-secondary" id="refresh-models" data-testid="refresh-models" onclick="refreshModels()" data-i18n="refresh_models">%s</button></div>
+    <div class="metric metric-model" data-testid="metric-model"><div class="metric-model-top"><span class="k" data-i18n="rail_model">%s</span><button type="button" class="btn-secondary" id="refresh-models" data-testid="refresh-models" onclick="refreshModels()" data-i18n="refresh_models">%s</button></div><select id="model-select" class="v" data-testid="model-select"><option value="%s" selected>%s</option></select></div>
     <p id="model-select-hint" class="hint" hidden></p>
     <div class="metric"><span class="k" data-i18n="timezone">%s</span><span class="v">%s</span></div>
   </div>
@@ -1452,7 +1460,7 @@ renderTimes();
 		html.EscapeString(t("rail_now")),
 		html.EscapeString(t("next_run")), html.EscapeString(railNext),
 		html.EscapeString(t("rail_whitelist")), selectedN, len(st.Accounts),
-		html.EscapeString(t("rail_model")), html.EscapeString(st.Model), html.EscapeString(st.Model), html.EscapeString(t("refresh_models")),
+		html.EscapeString(t("rail_model")), html.EscapeString(t("refresh_models")), html.EscapeString(st.Model), html.EscapeString(st.Model),
 		html.EscapeString(t("timezone")), html.EscapeString(st.Timezone),
 		html.EscapeString(t("rail_key")),
 		html.EscapeString(t("key_placeholder")),

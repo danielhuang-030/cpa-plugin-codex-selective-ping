@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="zh-Hant" data-theme="dark">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Model row layout mock — Taste preserve</title>
+<style>
+  :root[data-theme="dark"] {
+    --bg: #141018; --bg-2: #1c1620; --ink: #f4efe8; --ink-soft: #b9aea3;
+    --line: #3a3038; --panel: #1e1822; --panel-2: #261f2b;
+    --accent: #e08a52; --accent-ink: #1a1010;
+    --warn: #e2b16a;
+    --chip: #2c2430;
+    --shadow: 0 18px 40px rgba(0,0,0,.35);
+    --ui: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  * { box-sizing: border-box }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: var(--ui); line-height: 1.45; padding: 24px 20px 48px;
+  }
+  h1 { font-size: 18px; margin: 0 0 6px; letter-spacing: -.02em }
+  .lede { color: var(--ink-soft); font-size: 13px; margin: 0 0 22px }
+  .grid {
+    display: grid; grid-template-columns: repeat(3, minmax(240px, 1fr));
+    gap: 16px; align-items: start;
+  }
+  @media (max-width: 900px) { .grid { grid-template-columns: 1fr } }
+  .card {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 22px; padding: 14px 14px 16px; box-shadow: var(--shadow);
+  }
+  .card.rec { outline: 2px solid color-mix(in srgb, var(--accent) 70%, transparent); }
+  .tag {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 11px; font-weight: 700; letter-spacing: .06em;
+    text-transform: uppercase; color: var(--ink-soft); margin-bottom: 10px;
+  }
+  .tag .pill {
+    background: var(--chip); color: var(--ink); padding: 2px 8px;
+    border-radius: 999px; text-transform: none; letter-spacing: 0; font-weight: 600;
+  }
+  .tag .pill.ok { background: color-mix(in srgb, var(--accent) 28%, var(--chip)); color: var(--accent); }
+  .rail-block h3 {
+    margin: 0 0 8px; font-size: 11px; letter-spacing: .08em;
+    text-transform: uppercase; color: var(--ink-soft); font-weight: 700;
+  }
+  .metric {
+    display:flex; justify-content:space-between; align-items:baseline;
+    padding: 8px 0; border-bottom: 1px solid var(--line);
+    font-variant-numeric: tabular-nums;
+  }
+  .metric:last-child { border-bottom: 0 }
+  .metric .k { color: var(--ink-soft); font-size: 12px }
+  .metric .v { font-weight: 700; font-size: 14px }
+
+  /* CURRENT — wraps */
+  .metric.metric-model-current {
+    align-items: center; gap: 8px; flex-wrap: wrap;
+  }
+  .metric.metric-model-current #model-select-a {
+    max-width: 58%; min-width: 0;
+    font: inherit; font-weight: 700; font-size: 13px;
+    border: 1px solid var(--line); border-radius: 8px;
+    background: var(--panel-2); color: var(--ink); padding: 2px 6px;
+  }
+  .metric.metric-model-current .btn {
+    flex: 0 0 auto; padding: 6px 10px; font-size: 12px;
+  }
+
+  /* SCHEME 1 — label+btn row, select full width */
+  .metric.metric-model-s1 {
+    display: flex; flex-direction: column; align-items: stretch;
+    gap: 8px; padding: 8px 0;
+  }
+  .metric.metric-model-s1 .row-top {
+    display: flex; justify-content: space-between; align-items: center;
+    gap: 8px; width: 100%;
+  }
+  .metric.metric-model-s1 .row-top .k { flex: 0 0 auto }
+  .metric.metric-model-s1 .btn { flex: 0 0 auto; white-space: nowrap; padding: 6px 10px; font-size: 12px }
+  .metric.metric-model-s1 select {
+    width: 100%; min-width: 0;
+    font: inherit; font-weight: 700; font-size: 13px;
+    border: 1px solid var(--line); border-radius: 8px;
+    background: var(--panel-2); color: var(--ink); padding: 6px 8px;
+  }
+
+  /* SCHEME 2 — nowrap shrink */
+  .metric.metric-model-s2 {
+    align-items: center; gap: 8px; flex-wrap: nowrap;
+  }
+  .metric.metric-model-s2 .k { flex: 0 0 auto }
+  .metric.metric-model-s2 select {
+    flex: 1 1 auto; min-width: 0; max-width: none;
+    font: inherit; font-weight: 700; font-size: 13px;
+    border: 1px solid var(--line); border-radius: 8px;
+    background: var(--panel-2); color: var(--ink); padding: 2px 6px;
+  }
+  .metric.metric-model-s2 .btn {
+    flex: 0 0 auto; white-space: nowrap; padding: 6px 10px; font-size: 12px;
+  }
+
+  .btn {
+    font: inherit; cursor: default;
+    background: var(--panel-2); color: var(--ink);
+    border: 1px solid var(--line); border-radius: 8px;
+  }
+  .note { margin: 10px 0 0; font-size: 12px; color: var(--ink-soft) }
+  .note.warn { color: var(--warn) }
+</style>
+</head>
+<body>
+  <h1>模型列排版 mock</h1>
+  <p class="lede">Taste redesign–preserve · 暗色 rail · 長模型 id 壓力測試 · 建議方案 1</p>
+  <div class="grid">
+    <section class="card" data-testid="mock-current">
+      <div class="tag">現況 <span class="pill">換行壞掉</span></div>
+      <div class="rail-block" style="margin:0;padding:0;border:0">
+        <h3>此刻</h3>
+        <div class="metric"><span class="k">下次執行</span><span class="v">05:30</span></div>
+        <div class="metric"><span class="k">白名單</span><span class="v">2 / 2</span></div>
+        <div class="metric metric-model-current">
+          <span class="k">模型</span>
+          <select id="model-select-a">
+            <option selected>commandcode-go/gpt-5.2-very-long-name</option>
+            <option>gpt-5.6-luna</option>
+            <option>gpt-6-luna</option>
+          </select>
+          <button type="button" class="btn">更新模型</button>
+        </div>
+      </div>
+      <p class="note warn">同一列 flex-wrap：按鈕掉到下一行。</p>
+    </section>
+
+    <section class="card rec" data-testid="mock-scheme-1">
+      <div class="tag">方案 1 <span class="pill ok">建議</span></div>
+      <div class="rail-block" style="margin:0;padding:0;border:0">
+        <h3>此刻</h3>
+        <div class="metric"><span class="k">下次執行</span><span class="v">05:30</span></div>
+        <div class="metric"><span class="k">白名單</span><span class="v">2 / 2</span></div>
+        <div class="metric metric-model-s1">
+          <div class="row-top">
+            <span class="k">模型</span>
+            <button type="button" class="btn">更新模型</button>
+          </div>
+          <select>
+            <option selected>commandcode-go/gpt-5.2-very-long-name</option>
+            <option>gpt-5.6-luna</option>
+            <option>gpt-6-luna</option>
+          </select>
+        </div>
+      </div>
+      <p class="note">標籤＋按鈕同一列；下拉滿寬，長名稱不再擠按鈕。</p>
+    </section>
+
+    <section class="card" data-testid="mock-scheme-2">
+      <div class="tag">方案 2 <span class="pill">最小改動</span></div>
+      <div class="rail-block" style="margin:0;padding:0;border:0">
+        <h3>此刻</h3>
+        <div class="metric"><span class="k">下次執行</span><span class="v">05:30</span></div>
+        <div class="metric"><span class="k">白名單</span><span class="v">2 / 2</span></div>
+        <div class="metric metric-model-s2">
+          <span class="k">模型</span>
+          <select>
+            <option selected>commandcode-go/gpt-5.2-very-long-name</option>
+            <option>gpt-5.6-luna</option>
+            <option>gpt-6-luna</option>
+          </select>
+          <button type="button" class="btn">更新模型</button>
+        </div>
+      </div>
+      <p class="note">不換行、下拉可縮；按鈕沒換位置，窄欄仍擠。</p>
+    </section>
+  </div>
+</body>
+</html>
