@@ -11,7 +11,7 @@ import (
 
 func TestRenderStatusPageChineseAndQuotaDash(t *testing.T) {
 	html := RenderStatusPage(StatusResponse{
-		Enabled: true, Version: "0.1.0", Model: "gpt-5.6-luna",
+		Enabled: true, Version: "0.1.0", Model: "gpt-6-luna",
 		Timezone: "Asia/Taipei", Times: []string{"06:00", "21:00"},
 		Accounts: []runstate.AccountView{
 			{AuthIndex: "1", Name: "alice", Email: "a@x.com", Selected: true, Plan: "Plus", Status: "success"},
@@ -36,7 +36,7 @@ func TestRenderStatusPageChineseAndQuotaDash(t *testing.T) {
 
 func TestRenderStatusPageEnabledCheckbox(t *testing.T) {
 	html := RenderStatusPage(StatusResponse{
-		Enabled: true, Version: "0.1.0", Model: "gpt-5.6-luna",
+		Enabled: true, Version: "0.1.0", Model: "gpt-6-luna",
 		Timezone: "Asia/Taipei", Times: []string{"21:00"},
 	}, LangZhHant)
 	if !strings.Contains(html, `id="schedule_enabled"`) {
@@ -58,7 +58,7 @@ func TestRenderStatusPageEnabledCheckbox(t *testing.T) {
 	}
 
 	htmlOff := RenderStatusPage(StatusResponse{
-		Enabled: false, Version: "0.1.0", Model: "gpt-5.6-luna",
+		Enabled: false, Version: "0.1.0", Model: "gpt-6-luna",
 		Timezone: "Asia/Taipei", Times: []string{"21:00"},
 	}, LangZhHant)
 	idx = strings.Index(htmlOff, `id="schedule_enabled"`)
@@ -73,7 +73,7 @@ func TestRenderStatusPageEnabledCheckbox(t *testing.T) {
 
 func TestRenderStatusPageSaveUsesScheduleEnabledNotEnabled(t *testing.T) {
 	html := RenderStatusPage(StatusResponse{
-		Enabled: true, Version: "0.1.0", Model: "gpt-5.6-luna",
+		Enabled: true, Version: "0.1.0", Model: "gpt-6-luna",
 		Timezone: "Asia/Taipei", Times: []string{"21:00"},
 	}, LangEn)
 	if !strings.Contains(html, `id="schedule_enabled"`) {
@@ -98,7 +98,7 @@ func TestRenderStatusPageSaveUsesScheduleEnabledNotEnabled(t *testing.T) {
 
 func TestRenderStatusPageThemeSyncJS(t *testing.T) {
 	html := RenderStatusPage(StatusResponse{
-		Enabled: true, Version: "0.1.0", Model: "gpt-5.6-luna",
+		Enabled: true, Version: "0.1.0", Model: "gpt-6-luna",
 		Timezone: "Asia/Taipei", Times: []string{"21:00"},
 	}, LangEn)
 	for _, want := range []string{
@@ -127,7 +127,7 @@ func TestPreferIDAuthIndexFirst(t *testing.T) {
 
 func TestRenderStatusPageCheckboxUsesAuthIndex(t *testing.T) {
 	html := RenderStatusPage(StatusResponse{
-		Enabled: true, Version: "0.1.0", Model: "gpt-5.6-luna",
+		Enabled: true, Version: "0.1.0", Model: "gpt-6-luna",
 		Timezone: "Asia/Taipei", Times: []string{"21:00"},
 		Accounts: []runstate.AccountView{
 			{AuthIndex: "auth-42", Name: "alice", Email: "a@x.com", Selected: true},
@@ -1152,7 +1152,7 @@ func TestPrinciplesHowBlockOmitsQuotaRemovedRow(t *testing.T) {
 
 func TestRenderStatusPageModelSelect(t *testing.T) {
 	html := RenderStatusPage(StatusResponse{
-		Enabled: true, Version: "0.2.3", Model: "gpt-5.6-luna",
+		Enabled: true, Version: "0.2.3", Model: "gpt-6-luna",
 		Timezone: "Asia/Taipei", Times: []string{"21:00"},
 	}, LangZhHant)
 	if !strings.Contains(html, `data-testid="model-select"`) && !strings.Contains(html, `id="model-select"`) {
@@ -1161,7 +1161,7 @@ func TestRenderStatusPageModelSelect(t *testing.T) {
 	if !strings.Contains(html, `id="model-select"`) {
 		t.Fatal(`missing id="model-select"`)
 	}
-	if !strings.Contains(html, `value="gpt-5.6-luna"`) {
+	if !strings.Contains(html, `value="gpt-6-luna"`) {
 		t.Fatal("model select must preload current effective model as an option")
 	}
 	// Must not leave the old static value span for the rail model row.
@@ -1182,10 +1182,13 @@ func TestRenderStatusPageModelSelect(t *testing.T) {
 
 func TestRenderStatusPageModelSelectFetchAndFilterJS(t *testing.T) {
 	html := RenderStatusPage(StatusResponse{
-		Enabled: true, Model: "gpt-5.6-luna", Times: []string{"21:00"},
+		Enabled: true, Model: "gpt-6-luna", Times: []string{"21:00"},
 	}, LangEn)
-	if !strings.Contains(html, `'/v1/models'`) && !strings.Contains(html, `"/v1/models"`) {
-		t.Fatal("JS must fetch /v1/models")
+	if !strings.Contains(html, `/v0/management/plugins/codex-selective-ping/models`) {
+		t.Fatal("JS must fetch plugin models endpoint")
+	}
+	if strings.Contains(html, `fetch('/v1/models'`) || strings.Contains(html, `fetch("/v1/models"`) {
+		t.Fatal("JS must not call /v1/models directly")
 	}
 	if !strings.Contains(html, "keepModel") {
 		t.Fatal("JS must define keepModel mirroring modelfilter.Keep")

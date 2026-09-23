@@ -61,6 +61,13 @@ func (h *Handler) Handle(req Request) Response {
 	case method == "GET" && strings.HasSuffix(path, "/plugins/codex-selective-ping/status"):
 		body, _ := json.Marshal(h.status())
 		return Response{StatusCode: 200, Headers: map[string][]string{"content-type": {"application/json; charset=utf-8"}, "cache-control": {"no-store"}}, Body: body}
+	case method == "GET" && strings.HasSuffix(path, "/plugins/codex-selective-ping/models"):
+		cfg := h.Plugin.Config()
+		origin := originFromHeaders(req.Headers)
+		key := bearerFromAuthHeader(req.Headers)
+		out := fetchFilteredModels(context.Background(), h.Plugin.Host, origin, key, cfg.Model)
+		body, _ := json.Marshal(out)
+		return Response{StatusCode: 200, Headers: map[string][]string{"content-type": {"application/json; charset=utf-8"}, "cache-control": {"no-store"}}, Body: body}
 	case method == "POST" && strings.HasSuffix(path, "/plugins/codex-selective-ping/run"):
 		if !h.Plugin.StartManualRun() {
 			body, _ := json.Marshal(map[string]any{"accepted": false, "running": true, "message": "a run is already in progress"})

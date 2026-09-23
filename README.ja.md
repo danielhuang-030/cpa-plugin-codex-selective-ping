@@ -10,7 +10,7 @@
 ## 機能
 
 - **許可リストのみ** — `accounts` に従う。空配列 → attempted は 0
-- **モデル選択** — 任意の設定 `model`；空／省略 → フォールバック `gpt-5.6-luna`
+- **モデル選択** — 任意の設定 `model`；空／省略 → フォールバック `gpt-6-luna`。管理 UI は plugin の `GET …/models` 経由で選択肢を取得（ブラウザから `GET /v1/models` を直接呼ばない）
 - **日次スケジュール** — IANA タイムゾーン + グローバル `times`；任意のアカウント別 `account_times`。CPA 起動時には ping しない
 - **管理 UI** — 繁体字中国語 / 英語 / 日本語（CPA 管理センターに追従。`?lang=` / `?theme=` で上書き可）；アカウントごとの継承／カスタム予定；展開可能なアカウント別実行履歴
 - **直近実行の永続化** — `{CPA ルート}/data/codex-selective-ping/run_history.json`（`auth-dir` / `auths/` には書かない）
@@ -76,7 +76,7 @@ plugins:
         - "21:00"
       history_limit: 60
       retry_count: 2
-      model: gpt-5.6-luna
+      model: gpt-6-luna
       accounts:
         - "alice@example.com"
         - "bob@example.com"
@@ -121,7 +121,7 @@ cp package/codex-selective-ping.so /path/to/cpa/plugins/
 | `data_dir` | string | 任意。`run_history.json` のディレクトリ（相対パスは CPA cwd 基準） |
 | `history_limit` | int | 保持する実行履歴の上限（既定 **60**；≤0 は 60） |
 | `retry_count` | int | **limited**／クォータ失敗時に、何回追加で再試行するか。間隔は固定 **60 秒**（既定 **2**；`0` で無効）。limited 以外はこの経路で再試行しません。 |
-| `model` | string | 任意。ping に使う Codex モデル id。空／省略 → フォールバック `gpt-5.6-luna` |
+| `model` | string | 任意。ping に使う Codex モデル id。空／省略 → フォールバック `gpt-6-luna` |
 | `state_path` | string | 任意。直近実行ファイルのフルパス（`data_dir` より優先） |
 
 **スケジュール動作:** スケジューラは許可リスト各アカウントの実効時刻の**和集合**を待ちます（非空のカスタムがあればそれ、なければグローバル `times`）。ある `HH:MM` で発火したとき、そのスロットを実効時刻に含むアカウントだけを ping します。手動／**今すぐ実行** は許可リスト全体を対象にし、履歴に残ります（`force`）。
@@ -148,9 +148,12 @@ GET /v0/resource/plugins/codex-selective-ping/status
 
 ```text
 GET        /v0/management/plugins/codex-selective-ping/status
+GET        /v0/management/plugins/codex-selective-ping/models
 POST       /v0/management/plugins/codex-selective-ping/run
 GET/PATCH  /v0/management/plugins/codex-selective-ping/config
 ```
+
+`GET .../models` はフィルタ済みの OpenAI 風 `{data:[{id}]}` を返す（Management Key → 先頭 Codex token で上流を代行）。上流がすべて失敗しても **200** でフォールバック id（設定済み `model` + `gpt-6-luna`）と `warning` を返す。
 
 `POST .../run` は **202**。実行中なら **409**。
 

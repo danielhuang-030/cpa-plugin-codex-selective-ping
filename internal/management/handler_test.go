@@ -286,3 +286,78 @@ func TestStatusJSONEmptyModelFallsBack(t *testing.T) {
 		t.Fatalf("model=%q want %q (pinger.ModelName fallback)", st.Model, pinger.ModelName)
 	}
 }
+
+func TestModelsEndpointManagementKeyOK(t *testing.T) {
+	body, _ := json.Marshal(map[string]any{
+		"data": []map[string]any{
+			{"id": "gpt-6-luna", "owned_by": "openai"},
+			{"id": "claude-3", "owned_by": "anthropic"},
+		},
+	})
+	host := &modelsHost{script: []hostapi.HTTPResponse{{StatusCode: 200, Body: body}}}
+	p := plugin.New(host, "0.2.5")
+	p.ApplyConfig(config.Config{Enabled: true, Model: "gpt-6-luna"})
+	defer p.Shutdown()
+	h := &Handler{Plugin: p}
+	resp := h.Handle(Request{
+		Method: "GET",
+		Path:   "/v0/management/plugins/codex-selective-ping/models",
+		Headers: map[string][]string{
+			"Authorization": {"Bearer mgmt-key"},
+			"Host":          {"cpa.test"},
+		},
+	})
+	if resp.StatusCode != 200 {
+		t.Fatalf("status=%d body=%s", resp.StatusCode, resp.Body)
+	}
+	var out modelsListResponse
+	if err := json.Unmarshal(resp.Body, &out); err != nil {
+		t.Fatal(err)
+	}
+	if out.Warning != "" {
+		t.Fatalf("warning=%q", out.Warning)
+	}
+	ids := modelIDs(out)
+	if !hasID(ids, "gpt-6-luna") || hasID(ids, "claude-3") {
+		t.Fatalf("ids=%v", ids)
+	}
+	if len(host.calls) != 1 || host.calls[0].URL != "http://cpa.test/v1/models" {
+		t.Fatalf("calls=%v", host.calls)
+	}
+}
+
+func TestModelsEndpointFallbackOnUpstream401(t *testing.T) {
+	host := &modelsHost{
+		files: []hostapi.AuthFile{{AuthIndex: "1", Provider: "codex"}},
+		script: []hostapi.HTTPResponse{
+			{StatusCode: 401, Body: []byte(`{}`)},
+			{StatusCode: 401, Body: []byte(`{}`)},
+		},
+	}
+	p := plugin.New(host, "0.2.5")
+	p.ApplyConfig(config.Config{Enabled: true, Model: "my-custom"})
+	defer p.Shutdown()
+	h := &Handler{Plugin: p}
+	resp := h.Handle(Request{
+		Method: "GET",
+		Path:   "/v0/management/plugins/codex-selective-ping/models",
+		Headers: map[string][]string{
+			"Authorization": {"Bearer mgmt-key"},
+			"Host":          {"cpa.test"},
+		},
+	})
+	if resp.StatusCode != 200 {
+		t.Fatalf("status=%d body=%s", resp.StatusCode, resp.Body)
+	}
+	var out modelsListResponse
+	if err := json.Unmarshal(resp.Body, &out); err != nil {
+		t.Fatal(err)
+	}
+	if out.Warning == "" {
+		t.Fatal("expected warning")
+	}
+	ids := modelIDs(out)
+	if !hasID(ids, "my-custom") || !hasID(ids, pinger.ModelName) {
+		t.Fatalf("ids=%v", ids)
+	}
+}

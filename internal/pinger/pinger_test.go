@@ -124,3 +124,9 @@ func TestPingDefaultModelNameWhenPassed(t *testing.T) {
 		t.Fatalf("request model=%q want %q", h.lastModel, ModelName)
 	}
 }
+
+func TestModelNameIsGPT6Luna(t *testing.T) {
+	if ModelName != "gpt-6-luna" {
+		t.Fatalf("ModelName=%q want gpt-6-luna", ModelName)
+	}
+}
