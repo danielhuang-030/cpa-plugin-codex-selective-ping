@@ -10,7 +10,7 @@
 ## 機能
 
 - **許可リストのみ** — `accounts` に従う。空配列 → attempted は 0
-- **モデル選択** — 任意の設定 `model`；空／省略 → フォールバック `gpt-6-luna`。管理 UI は plugin の `GET …/models` 経由で選択肢を取得（ブラウザから `GET /v1/models` を直接呼ばない）
+- **モデル選択** — 任意の設定 `model`；空／省略 → フォールバック `gpt-6-luna`。管理 UI は plugin の `GET …/models` 経由で選択肢を取得（「モデル更新」；Management Key → `api-keys` → `/v1/models`。ブラウザから `GET /v1/models` を直接呼ばない）
 - **日次スケジュール** — IANA タイムゾーン + グローバル `times`；任意のアカウント別 `account_times`。CPA 起動時には ping しない
 - **管理 UI** — 繁体字中国語 / 英語 / 日本語（CPA 管理センターに追従。`?lang=` / `?theme=` で上書き可）；アカウントごとの継承／カスタム予定；展開可能なアカウント別実行履歴
 - **直近実行の永続化** — `{CPA ルート}/data/codex-selective-ping/run_history.json`（`auth-dir` / `auths/` には書かない）
@@ -153,7 +153,7 @@ POST       /v0/management/plugins/codex-selective-ping/run
 GET/PATCH  /v0/management/plugins/codex-selective-ping/config
 ```
 
-`GET .../models` はフィルタ済みの OpenAI 風 `{data:[{id}]}` を返す（Management Key → 先頭 Codex token で上流を代行）。上流がすべて失敗しても **200** でフォールバック id（設定済み `model` + `gpt-6-luna`）と `warning` を返す。
+`GET .../models` はフィルタ済みの OpenAI 風 `{data:[{id}]}` を返す（Management Key → `GET /v0/management/api-keys` でプロキシ API Key → `/v1/models`；失敗時は先頭 Codex token）。上流がすべて失敗しても **200** でフォールバック id（設定済み `model` + `gpt-6-luna`）と `warning` を返す。Management Key が空のとき「モデル更新」は保存と同じく Key 入力を促す。
 
 `POST .../run` は **202**。実行中なら **409**。
 

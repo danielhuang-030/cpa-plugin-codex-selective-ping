@@ -54,27 +54,40 @@ func TestBearerFromAuthHeader(t *testing.T) {
 	}
 }
 
-func TestFetchFilteredModelsManagementKeyOK(t *testing.T) {
-	body, _ := json.Marshal(map[string]any{
+
+
+
+
+func TestFetchFilteredModelsAPIKeyOK(t *testing.T) {
+	keysBody, _ := json.Marshal(map[string]any{"api-keys": []string{"sk-proxy"}})
+	modelsBody, _ := json.Marshal(map[string]any{
 		"data": []map[string]any{
 			{"id": "gpt-6-luna", "owned_by": "openai"},
 			{"id": "claude-3", "owned_by": "anthropic"},
 		},
 	})
-	h := &modelsHost{script: []hostapi.HTTPResponse{{StatusCode: 200, Body: body}}}
+	h := &modelsHost{script: []hostapi.HTTPResponse{
+		{StatusCode: 200, Body: keysBody},
+		{StatusCode: 200, Body: modelsBody},
+	}}
 	out := fetchFilteredModels(context.Background(), h, "http://cpa.test", "mgmt-key", "")
 	if out.Warning != "" {
 		t.Fatalf("warning=%q", out.Warning)
 	}
-	if len(h.calls) != 1 {
+	if len(h.calls) != 2 {
 		t.Fatalf("calls=%d", len(h.calls))
 	}
-	auth := firstHeader(h.calls[0].Headers, "Authorization")
-	if auth != "Bearer mgmt-key" {
-		t.Fatalf("auth=%q", auth)
+	if h.calls[0].URL != "http://cpa.test/v0/management/api-keys" {
+		t.Fatalf("keys url=%q", h.calls[0].URL)
 	}
-	if h.calls[0].URL != "http://cpa.test/v1/models" {
-		t.Fatalf("url=%q", h.calls[0].URL)
+	if firstHeader(h.calls[0].Headers, "Authorization") != "Bearer mgmt-key" {
+		t.Fatalf("keys auth=%q", firstHeader(h.calls[0].Headers, "Authorization"))
+	}
+	if h.calls[1].URL != "http://cpa.test/v1/models" {
+		t.Fatalf("models url=%q", h.calls[1].URL)
+	}
+	if firstHeader(h.calls[1].Headers, "Authorization") != "Bearer sk-proxy" {
+		t.Fatalf("models auth=%q", firstHeader(h.calls[1].Headers, "Authorization"))
 	}
 	ids := modelIDs(out)
 	if !hasID(ids, "gpt-6-luna") || hasID(ids, "claude-3") {
@@ -82,7 +95,7 @@ func TestFetchFilteredModelsManagementKeyOK(t *testing.T) {
 	}
 }
 
-func TestFetchFilteredModelsMgmt401ThenCodexOK(t *testing.T) {
+func TestFetchFilteredModelsAPIKeysFailThenCodexOK(t *testing.T) {
 	okBody, _ := json.Marshal(map[string]any{
 		"data": []map[string]any{{"id": "gpt-4o", "owned_by": "openai"}},
 	})
@@ -100,6 +113,9 @@ func TestFetchFilteredModelsMgmt401ThenCodexOK(t *testing.T) {
 	}
 	if len(h.calls) != 2 {
 		t.Fatalf("calls=%d", len(h.calls))
+	}
+	if h.calls[0].URL != "https://cpa.test/v0/management/api-keys" {
+		t.Fatalf("first url=%q", h.calls[0].URL)
 	}
 	if firstHeader(h.calls[1].Headers, "Authorization") != "Bearer codex-tok" {
 		t.Fatalf("second auth=%q", firstHeader(h.calls[1].Headers, "Authorization"))
@@ -148,3 +164,27 @@ func mustJSON(v any) []byte {
 	b, _ := json.Marshal(v)
 	return b
 }
+
+func TestFirstAPIKeyFromBodyStringArray(t *testing.T) {
+	got, err := firstAPIKeyFromBody([]byte(`{"api-keys":[" sk-a ","sk-b"]}`))
+	if err != nil || got != "sk-a" {
+		t.Fatalf("got %q err=%v", got, err)
+	}
+}
+
+func TestFirstAPIKeyFromBodyObjectArray(t *testing.T) {
+	got, err := firstAPIKeyFromBody([]byte(`{"api-keys":[{"api-key":"sk-obj"},{"key":"sk-2"}]}`))
+	if err != nil || got != "sk-obj" {
+		t.Fatalf("got %q err=%v", got, err)
+	}
+}
+
+func TestFirstAPIKeyFromBodyEmpty(t *testing.T) {
+	if _, err := firstAPIKeyFromBody([]byte(`{"api-keys":[]}`)); err == nil {
+		t.Fatal("expected error")
+	}
+	if _, err := firstAPIKeyFromBody([]byte(`{}`)); err == nil {
+		t.Fatal("expected error")
+	}
+}
+
