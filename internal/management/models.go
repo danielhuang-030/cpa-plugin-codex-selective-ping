@@ -98,6 +98,9 @@ func fetchFilteredModels(ctx context.Context, h hostapi.Host, origin, management
 	cfgModel = strings.TrimSpace(cfgModel)
 
 	var lastWarn string
+	if origin == "" {
+		lastWarn = "models: empty origin (missing Host/X-Csp-Origin)"
+	}
 	try := func(token, label string) ([]modelsListItem, bool) {
 		if token == "" || origin == "" || h == nil {
 			return nil, false

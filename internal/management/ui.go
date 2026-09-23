@@ -1335,7 +1335,9 @@ async function loadModels(){
   const k=key();
   if(!k){ return; }
   try{
-    const r=await fetch(MODELS_URL,{headers:{'Authorization':'Bearer '+k}});
+    const headers={'Authorization':'Bearer '+k};
+    try{ if(typeof location!=='undefined' && location.origin){ headers['X-Csp-Origin']=location.origin; } }catch(e){}
+    const r=await fetch(MODELS_URL,{headers:headers});
     if(!r.ok){
       setModelSelectHint('models: HTTP '+r.status);
       const o=document.getElementById('result');
