@@ -3,6 +3,7 @@ package management
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"cpa-plugin-codex-selective-ping/internal/hostapi"
@@ -140,6 +141,26 @@ func TestFetchFilteredModelsBothFailFallback(t *testing.T) {
 	ids := modelIDs(out)
 	if !hasID(ids, "gpt-5.6-luna") || !hasID(ids, pinger.ModelName) {
 		t.Fatalf("ids=%v want configured + %s", ids, pinger.ModelName)
+	}
+}
+
+func TestFetchFilteredModelsEmptyOriginWarning(t *testing.T) {
+	h := &modelsHost{
+		files: []hostapi.AuthFile{{AuthIndex: "1", Provider: "codex"}},
+	}
+	out := fetchFilteredModels(context.Background(), h, "", "mgmt-key", "gpt-5.6-luna")
+	if out.Warning == "" {
+		t.Fatal("expected warning")
+	}
+	if !strings.Contains(out.Warning, "empty origin") {
+		t.Fatalf("warning should mention empty origin: %q", out.Warning)
+	}
+	ids := modelIDs(out)
+	if !hasID(ids, "gpt-5.6-luna") || !hasID(ids, pinger.ModelName) {
+		t.Fatalf("ids=%v want configured + %s", ids, pinger.ModelName)
+	}
+	if len(h.calls) != 0 {
+		t.Fatalf("empty origin must not call HTTP; calls=%d", len(h.calls))
 	}
 }
 

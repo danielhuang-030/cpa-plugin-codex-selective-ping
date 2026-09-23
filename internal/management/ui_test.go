@@ -1246,3 +1246,25 @@ func TestRenderStatusPageRefreshModelsButton(t *testing.T) {
 		t.Fatal("expected msgNeedKey for empty-key handling")
 	}
 }
+
+func TestRenderStatusPageModelsFetchSendsXCspOrigin(t *testing.T) {
+	html := RenderStatusPage(StatusResponse{Version: "0.2.7", Model: "gpt-6-luna"}, LangEn)
+	idx := strings.Index(html, "async function loadModels()")
+	if idx < 0 {
+		t.Fatal("missing loadModels")
+	}
+	end := idx + 900
+	if end > len(html) {
+		end = len(html)
+	}
+	chunk := html[idx:end]
+	if !strings.Contains(chunk, "MODELS_URL") {
+		t.Fatalf("loadModels must fetch MODELS_URL; chunk=%q", chunk[:min(200, len(chunk))])
+	}
+	if !strings.Contains(chunk, "X-Csp-Origin") {
+		t.Fatal("loadModels fetch headers must include X-Csp-Origin")
+	}
+	if !strings.Contains(chunk, "location.origin") {
+		t.Fatal("X-Csp-Origin must be set from location.origin")
+	}
+}

@@ -153,7 +153,7 @@ POST       /v0/management/plugins/codex-selective-ping/run
 GET/PATCH  /v0/management/plugins/codex-selective-ping/config
 ```
 
-`GET .../models` はフィルタ済みの OpenAI 風 `{data:[{id}]}` を返す（Management Key → `GET /v0/management/api-keys` でプロキシ API Key → `/v1/models`；失敗時は先頭 Codex token）。上流がすべて失敗しても **200** でフォールバック id（設定済み `model` + `gpt-6-luna`）と `warning` を返す。Management Key が空のとき「モデル更新」は保存と同じく Key 入力を促す。
+`GET .../models` はフィルタ済みの OpenAI 風 `{data:[{id}]}` を返す（Management Key → `GET /v0/management/api-keys` でプロキシ API Key → `/v1/models`；失敗時は先頭 Codex token）。上流がすべて失敗しても **200** でフォールバック id（設定済み `model` + `gpt-6-luna`）と `warning` を返す。Management Key が空のとき「モデル更新」は保存と同じく Key 入力を促す。管理 UI は `X-Csp-Origin`（`location.origin`）を送る（CPA pluginhost が転送時に `Host` を省くことがあるため）。
 
 `POST .../run` は **202**。実行中なら **409**。
 

@@ -153,7 +153,7 @@ POST       /v0/management/plugins/codex-selective-ping/run
 GET/PATCH  /v0/management/plugins/codex-selective-ping/config
 ```
 
-`GET .../models` 回傳過濾後的 OpenAI 風格 `{data:[{id}]}`（Management Key → `GET /v0/management/api-keys` 取代理 API Key → `/v1/models`；失敗再試第一個 Codex token）。上游全失敗仍 **200**，回傳後備 id（已設定的 `model` + `gpt-6-luna`）與 `warning`。UI「更新模型」在未填 Management Key 時與儲存設定相同，提示需要 Key。
+`GET .../models` 回傳過濾後的 OpenAI 風格 `{data:[{id}]}`（Management Key → `GET /v0/management/api-keys` 取代理 API Key → `/v1/models`；失敗再試第一個 Codex token）。上游全失敗仍 **200**，回傳後備 id（已設定的 `model` + `gpt-6-luna`）與 `warning`。UI「更新模型」在未填 Management Key 時與儲存設定相同，提示需要 Key。管理 UI 會帶 `X-Csp-Origin`（`location.origin`），因為 CPA pluginhost 轉送時常省略 `Host`。
 
 `POST .../run` 回 **202**；若已在執行則 **409**。
 

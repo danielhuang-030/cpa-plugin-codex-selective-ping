@@ -155,7 +155,7 @@ POST       /v0/management/plugins/codex-selective-ping/run
 GET/PATCH  /v0/management/plugins/codex-selective-ping/config
 ```
 
-`GET .../models` returns a filtered OpenAI-style `{data:[{id}]}` list (Management Key → `GET /v0/management/api-keys` → proxy API key → `/v1/models`; then first Codex token). On total upstream failure it still returns **200** with fallback ids (configured `model` + `gpt-6-luna`) and a `warning`. The Refresh models control prompts for a Management Key the same way Save does when the field is empty.
+`GET .../models` returns a filtered OpenAI-style `{data:[{id}]}` list (Management Key → `GET /v0/management/api-keys` → proxy API key → `/v1/models`; then first Codex token). On total upstream failure it still returns **200** with fallback ids (configured `model` + `gpt-6-luna`) and a `warning`. The Refresh models control prompts for a Management Key the same way Save does when the field is empty. The management UI sends `X-Csp-Origin` (`location.origin`) because CPA pluginhost often omits `Host` when forwarding.
 
 `POST .../run` returns **202**, or **409** if a run is already in progress.
 

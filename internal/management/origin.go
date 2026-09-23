@@ -3,9 +3,17 @@ package management
 import "strings"
 
 // originFromHeaders returns scheme://host with no trailing slash.
-// Prefer X-Forwarded-Proto + X-Forwarded-Host when host is present via forwarded
-// headers; otherwise use Host with scheme defaulting to http.
+// Prefer X-Csp-Origin (full origin) when present and valid; CPA pluginhost
+// often omits Host from cloned headers (net/http already moved it to r.Host).
+// Else prefer X-Forwarded-Proto + X-Forwarded-Host; otherwise Host with
+// scheme defaulting to http.
 func originFromHeaders(headers map[string][]string) string {
+	if csp := firstHeader(headers, "X-Csp-Origin"); csp != "" {
+		csp = strings.TrimRight(strings.TrimSpace(csp), "/")
+		if strings.Contains(csp, "://") {
+			return csp
+		}
+	}
 	host := firstHeader(headers, "X-Forwarded-Host", "Host")
 	if host == "" {
 		return ""
