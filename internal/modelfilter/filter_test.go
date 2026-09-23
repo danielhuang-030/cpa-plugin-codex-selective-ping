@@ -7,7 +7,7 @@ func TestKeepCodexOpenAIChatGPT(t *testing.T) {
 		id, owned string
 		want      bool
 	}{
-		{"gpt-5.6-luna", "openai", true},
+		{"gpt-6-luna", "openai", true},
 		{"codex-mini", "", true},
 		{"chatgpt-4o", "openai", true},
 		{"claude-sonnet", "anthropic", false},

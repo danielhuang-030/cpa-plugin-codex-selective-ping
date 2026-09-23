@@ -73,7 +73,7 @@ func TestResolveLang(t *testing.T) {
 
 func TestRenderStatusPageEnglish(t *testing.T) {
 	html := RenderStatusPage(StatusResponse{
-		Enabled: true, Version: "0.1.0", Model: "gpt-5.6-luna",
+		Enabled: true, Version: "0.1.0", Model: "gpt-6-luna",
 		Timezone: "Asia/Taipei", Times: []string{"21:00"},
 	}, LangEn)
 	for _, want := range []string{
@@ -92,7 +92,7 @@ func TestRenderStatusPageEnglish(t *testing.T) {
 
 func TestRenderStatusPageJapanese(t *testing.T) {
 	html := RenderStatusPage(StatusResponse{
-		Enabled: true, Version: "0.1.0", Model: "gpt-5.6-luna",
+		Enabled: true, Version: "0.1.0", Model: "gpt-6-luna",
 		Timezone: "Asia/Taipei", Times: []string{"21:00"},
 	}, LangJa)
 	for _, want := range []string{
@@ -107,7 +107,7 @@ func TestRenderStatusPageJapanese(t *testing.T) {
 
 func TestRenderStatusPageSwitcherAndCPABootstrap(t *testing.T) {
 	html := RenderStatusPage(StatusResponse{
-		Enabled: true, Version: "0.1.0", Model: "gpt-5.6-luna",
+		Enabled: true, Version: "0.1.0", Model: "gpt-6-luna",
 		Timezone: "Asia/Taipei", Times: []string{"21:00"},
 	}, LangZhHant)
 	for _, want := range []string{
@@ -194,7 +194,7 @@ func TestCatalogParity(t *testing.T) {
 
 func TestLastRunChipsTranslated(t *testing.T) {
 	html := RenderStatusPage(StatusResponse{
-		Enabled: true, Version: "0.1.0", Model: "gpt-5.6-luna",
+		Enabled: true, Version: "0.1.0", Model: "gpt-6-luna",
 		Timezone: "Asia/Taipei", Times: []string{"21:00"},
 		Accounts: []runstate.AccountView{{AuthIndex: "idx-1", Name: "alice", Email: "a@x.com"}},
 		LastRun: &runstate.Summary{

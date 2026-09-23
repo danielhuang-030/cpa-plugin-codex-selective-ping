@@ -812,6 +812,7 @@ const msgRunningLabel = %q;
 const POLL_MS = 2500;
 const STATUS_URL = '/v0/management/plugins/codex-selective-ping/status';
 const RUN_URL = '/v0/management/plugins/codex-selective-ping/run';
+const MODELS_URL = '/v0/management/plugins/codex-selective-ping/models';
 let pollTimer = null;
 let times = Array.isArray(initialTimes) ? initialTimes.slice() : [];
 let accountTimes = (initialAccountTimes && typeof initialAccountTimes === 'object') ? JSON.parse(JSON.stringify(initialAccountTimes)) : {};
@@ -1321,7 +1322,7 @@ async function loadModels(){
   const k=key();
   if(!k){ return; }
   try{
-    const r=await fetch('/v1/models',{headers:{'Authorization':'Bearer '+k}});
+    const r=await fetch(MODELS_URL,{headers:{'Authorization':'Bearer '+k}});
     if(!r.ok){
       setModelSelectHint('models: HTTP '+r.status);
       const o=document.getElementById('result');
@@ -1338,7 +1339,8 @@ async function loadModels(){
     });
     kept.sort();
     rebuildModelSelect(kept, current);
-    setModelSelectHint('');
+    if(j && j.warning){ setModelSelectHint(String(j.warning)); }
+    else { setModelSelectHint(''); }
   }catch(e){
     setModelSelectHint(String(e));
     const o=document.getElementById('result');

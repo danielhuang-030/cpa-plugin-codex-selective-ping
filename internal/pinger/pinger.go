@@ -12,7 +12,7 @@ import (
 
 const (
 	CodexURL       = "https://chatgpt.com/backend-api/codex/responses"
-	ModelName      = "gpt-5.6-luna"
+	ModelName      = "gpt-6-luna"
 	DefaultPrompt  = "ping"
 	WindowInterval = 5 * time.Hour
 	WindowGuard    = 1 * time.Second
@@ -203,6 +203,15 @@ func isRetryableHTTP(code int) bool {
 	default:
 		return false
 	}
+}
+
+// AccessTokenFromAuthJSON extracts an access token from host AuthGet JSON.
+func AccessTokenFromAuthJSON(raw []byte) (string, error) {
+	m, err := parseAuthMaterial(raw)
+	if err != nil {
+		return "", err
+	}
+	return m.AccessToken, nil
 }
 
 func parseAuthMaterial(raw []byte) (authMaterial, error) {
