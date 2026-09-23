@@ -1165,18 +1165,24 @@ func TestRenderStatusPageModelSelect(t *testing.T) {
 		t.Fatal("model select must preload current effective model as an option")
 	}
 	// Must not leave the old static value span for the rail model row.
-	if strings.Contains(html, `data-i18n="rail_model"`) {
-		idx := strings.Index(html, `data-i18n="rail_model"`)
-		chunk := html[idx:]
-		if end := strings.Index(chunk, `</div>`); end > 0 {
+	idx := strings.Index(html, `class="metric metric-model"`)
+	if idx < 0 {
+		t.Fatal(`missing class="metric metric-model"`)
+	}
+	chunk := html[idx:]
+	if end := strings.Index(chunk, `</div>`); end > 0 {
+		// Prefer the outer metric close after nested metric-model-top.
+		if closeAll := strings.Index(chunk, `<p id="model-select-hint"`); closeAll > 0 {
+			chunk = chunk[:closeAll]
+		} else {
 			chunk = chunk[:end]
 		}
-		if strings.Contains(chunk, `<span class="v">`) {
-			t.Fatalf("rail model value must be a <select>, not span.v; chunk=%q", chunk)
-		}
-		if !strings.Contains(chunk, "<select") {
-			t.Fatalf("rail model row must contain <select>; chunk=%q", chunk)
-		}
+	}
+	if strings.Contains(chunk, `<span class="v">`) {
+		t.Fatalf("rail model value must be a <select>, not span.v; chunk=%q", chunk)
+	}
+	if !strings.Contains(chunk, "<select") {
+		t.Fatalf("rail model row must contain <select>; chunk=%q", chunk)
 	}
 }
 
@@ -1266,5 +1272,55 @@ func TestRenderStatusPageModelsFetchSendsXCspOrigin(t *testing.T) {
 	}
 	if !strings.Contains(chunk, "location.origin") {
 		t.Fatal("X-Csp-Origin must be set from location.origin")
+	}
+}
+
+func TestRenderStatusPageModelRowLayoutScheme1(t *testing.T) {
+	html := RenderStatusPage(StatusResponse{
+		Enabled: true, Version: "0.2.9", Model: "commandcode-go/gpt-5.2-very-long-name",
+		Timezone: "Asia/Taipei", Times: []string{"21:00"},
+	}, LangZhHant)
+
+	if !strings.Contains(html, "metric-model-top") {
+		t.Fatal(`scheme 1 markup must include class "metric-model-top"`)
+	}
+
+	idx := strings.Index(html, `class="metric metric-model"`)
+	if idx < 0 {
+		t.Fatal(`missing model metric class="metric metric-model"`)
+	}
+	chunk := html[idx:]
+	if end := strings.Index(chunk, `<p id="model-select-hint"`); end > 0 {
+		chunk = chunk[:end]
+	}
+	refreshIdx := strings.Index(chunk, `id="refresh-models"`)
+	if refreshIdx < 0 {
+		refreshIdx = strings.Index(chunk, `data-testid="refresh-models"`)
+	}
+	selectIdx := strings.Index(chunk, `id="model-select"`)
+	if refreshIdx < 0 || selectIdx < 0 {
+		t.Fatalf("model metric missing refresh button or select; chunk=%q", chunk)
+	}
+	if refreshIdx > selectIdx {
+		t.Fatalf("scheme 1: #refresh-models must appear before #model-select in the model metric; chunk=%q", chunk)
+	}
+
+	// CSS: stacked column, no wrap on .metric.metric-model; full-width select.
+	if strings.Contains(html, `.metric.metric-model { align-items: center; gap: 8px; flex-wrap: wrap }`) ||
+		strings.Contains(html, `.metric.metric-model{align-items:center;gap:8px;flex-wrap:wrap}`) {
+		t.Fatal(`.metric.metric-model must not use flex-wrap: wrap`)
+	}
+	if !strings.Contains(html, "metric-model-top") {
+		t.Fatal("CSS/HTML must include metric-model-top")
+	}
+	if !strings.Contains(html, `#model-select`) {
+		t.Fatal("missing #model-select CSS")
+	}
+	// Require full-width select (scheme 1) and reject old max-width:58%.
+	if strings.Contains(html, "max-width: 58%") || strings.Contains(html, "max-width:58%") {
+		t.Fatal(`#model-select must not use max-width: 58%`)
+	}
+	if !strings.Contains(html, "width: 100%") && !strings.Contains(html, "width:100%") {
+		t.Fatal(`#model-select CSS must set width: 100%`)
 	}
 }
