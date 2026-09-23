@@ -153,6 +153,7 @@ func managementRegistrationResult() map[string]any {
 	return map[string]any{
 		"routes": []map[string]string{
 			{"Method": "GET", "Path": "/plugins/codex-selective-ping/status", "Description": "JSON status"},
+			{"Method": "GET", "Path": "/plugins/codex-selective-ping/models", "Description": "Filtered model list for Management UI"},
 			{"Method": "POST", "Path": "/plugins/codex-selective-ping/run", "Description": "Run now for selected accounts"},
 		},
 		"resources": []map[string]string{

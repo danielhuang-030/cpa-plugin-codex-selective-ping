@@ -91,3 +91,22 @@ func TestRegistrationMetaRequiredByHost(t *testing.T) {
 		t.Fatalf("capabilities.management_api want true, got %#v", meta["capabilities"])
 	}
 }
+
+
+func TestManagementRegistrationIncludesModelsRoute(t *testing.T) {
+	res := managementRegistrationResult()
+	rs, ok := res["routes"].([]map[string]string)
+	if !ok {
+		t.Fatalf("routes type %T", res["routes"])
+	}
+	found := false
+	for _, r := range rs {
+		if r["Method"] == "GET" && r["Path"] == "/plugins/codex-selective-ping/models" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatal("management.register routes must include GET /plugins/codex-selective-ping/models")
+	}
+}
