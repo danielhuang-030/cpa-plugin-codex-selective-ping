@@ -23,7 +23,7 @@ func TestRenderStatusPageChineseAndQuotaDash(t *testing.T) {
 			t.Fatalf("missing %q", want)
 		}
 	}
-	if strings.Contains(html, "localStorage.setItem") {
+	if strings.Contains(html, "localStorage.setItem(KEY_STORAGE") {
 		t.Fatal("must not persist Management Key via localStorage.setItem")
 	}
 	if !strings.Contains(html, `type="password"`) {
@@ -622,6 +622,56 @@ func TestRenderStatusPageHistoryExpandPerAccount(t *testing.T) {
 	}
 }
 
+func TestRenderStatusPageHistPager(t *testing.T) {
+	htmlOut := RenderStatusPage(StatusResponse{
+		RunHistory: []runstate.Summary{
+			{At: time.Date(2026, 9, 22, 11, 0, 0, 0, time.UTC), Mode: "force", Succeeded: 1},
+			{At: time.Date(2026, 9, 22, 10, 0, 0, 0, time.UTC), Mode: "scheduled", Succeeded: 1},
+		},
+	}, LangEn)
+	if !strings.Contains(htmlOut, `data-testid="hist-pager"`) {
+		t.Fatal("missing hist-pager")
+	}
+	for _, v := range []string{`value="10"`, `value="20"`, `value="50"`} {
+		if !strings.Contains(htmlOut, v) {
+			t.Fatalf("missing page size option %s", v)
+		}
+	}
+	for _, marker := range []string{
+		`data-hist-prev`, `data-hist-next`, `data-hist-page-size`, `data-hist-page-label`,
+		`data-i18n="hist_pager_prev"`, `data-i18n="hist_pager_next"`, `data-i18n="hist_pager_per_page"`,
+	} {
+		if !strings.Contains(htmlOut, marker) {
+			t.Fatalf("missing history pager marker %s", marker)
+		}
+	}
+}
+
+func TestRenderStatusPageHistPagerJS(t *testing.T) {
+	htmlOut := RenderStatusPage(StatusResponse{
+		RunHistory: []runstate.Summary{
+			{At: time.Date(2026, 9, 22, 11, 0, 0, 0, time.UTC), Mode: "force", Succeeded: 1},
+		},
+	}, LangEn)
+	for _, needle := range []string{
+		`csp-hist-page-size`,
+		`HIST_PAGE_SIZE_DEFAULT = 10`,
+		`initHistPager`,
+		`histPage = 1`,
+	} {
+		if !strings.Contains(htmlOut, needle) {
+			t.Fatalf("missing JS needle %q", needle)
+		}
+	}
+}
+
+func TestRenderStatusPageHistPagerAbsentWhenEmpty(t *testing.T) {
+	htmlOut := RenderStatusPage(StatusResponse{}, LangEn)
+	if strings.Contains(htmlOut, `<div class="hist-pager" data-testid="hist-pager">`) {
+		t.Fatal("hist-pager must be absent when history is empty")
+	}
+}
+
 func TestRematerializeAccountTimesEmailKeyedToPreferID(t *testing.T) {
 	accounts := []runstate.AccountView{
 		{AuthIndex: "auth-bob", Name: "bob", Email: "bob@example.com", Selected: true},
@@ -842,7 +892,7 @@ func TestRenderStatusPageSessionStorageManagementKey(t *testing.T) {
 			t.Fatalf("missing sessionStorage marker %q", want)
 		}
 	}
-	if strings.Contains(html, "localStorage.setItem") {
+	if strings.Contains(html, "localStorage.setItem(KEY_STORAGE") {
 		t.Fatal("must not persist Management Key via localStorage.setItem")
 	}
 	// key() / bootstrap must restore before poll so running reload does not false-need_key
