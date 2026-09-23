@@ -121,8 +121,8 @@ func TestRenderStatusPageSwitcherAndCPABootstrap(t *testing.T) {
 			t.Fatalf("missing bootstrap/switcher piece %q", want)
 		}
 	}
-	if strings.Contains(html, "localStorage.setItem") {
-		t.Fatal("must not write CPA or Management Key into localStorage")
+	if strings.Contains(html, "localStorage.setItem(KEY_STORAGE") {
+		t.Fatal("must not write Management Key into localStorage")
 	}
 }
 
@@ -225,6 +225,7 @@ func TestV4DataI18nKeysPresentInAllLangs(t *testing.T) {
 		"sched_inherit", "sched_custom", "sched_effective", "sched_not_selected", "sched_add",
 		"rail_now", "rail_whitelist", "rail_model", "rail_key",
 		"run_history_title", "run_history_sub", "hist_expand", "hist_collapse", "hist_attempts",
+		"hist_pager_prev", "hist_pager_next", "hist_pager_per_page",
 		"mode_force", "mode_scheduled",
 		"last_run_receipt_label", "last_run_empty_title", "last_run_empty_body",
 		"chip_unselected",

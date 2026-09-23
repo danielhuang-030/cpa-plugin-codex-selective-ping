@@ -142,6 +142,7 @@ GET /v0/resource/plugins/codex-selective-ping/status
 - 主題：跟隨 CPA（`cli-proxy-theme` 等），`?theme=light|dark` 可覆寫（`<html data-theme>`）。
 - 帳號：勾選白名單；每個帳號可**繼承**全域 `times` 或使用**自訂** `account_times`。帳號區塊**不**顯示 5h／週限額度欄。
 - 執行歷史：可展開每筆執行 → 依帳號顯示狀態／嘗試次數／錯誤；包含排程與 force（手動）執行。
+- 歷史分頁：瀏覽器會將執行歷史列表分頁（預設 10 筆，可選 10／20／50）；偏好會儲存在 localStorage 的 `csp-hist-page-size`，不在插件設定中。
 
 ### Management API
 

@@ -142,6 +142,7 @@ GET /v0/resource/plugins/codex-selective-ping/status
 - テーマ: CPA に追従。`?theme=light|dark` で上書き（`<html data-theme>`）。
 - アカウント: 許可リストを選択。各アカウントはグローバル `times` を**継承**するか、**カスタム** `account_times` を使えます。アカウント UI に 5h／週次クォータ列は**出しません**。
 - 実行履歴: 各実行を展開 → アカウント別の状態／試行回数／エラー。スケジュール実行と force（手動）の両方を含みます。
+- 履歴のページ分割: ブラウザーが実行履歴リストをページ分割します（既定 10 件、10／20／50 件を選択可）；設定は localStorage の `csp-hist-page-size` に保存され、プラグイン設定には保存されません。
 
 ### Management API
 

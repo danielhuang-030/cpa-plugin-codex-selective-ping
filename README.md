@@ -144,6 +144,7 @@ GET /v0/resource/plugins/codex-selective-ping/status
 - Theme: CPA (`cli-proxy-theme` / `cli-proxy-color-scheme` / `theme`, then `prefers-color-scheme`); override `?theme=light|dark` (`data-theme` on `<html>`).
 - Accounts: select allowlist entries; each account can **inherit** the global `times` or use a **custom** `account_times` list. The account UI does **not** show 5h / weekly quota columns.
 - Run history: expandable per run → per-account status / attempts / error; includes scheduled and force (manual) runs.
+- History pagination: the browser paginates the history list (default 10; choose 10/20/50); the preference is stored in localStorage under `csp-hist-page-size`, not in plugin config.
 
 ### Management API
 

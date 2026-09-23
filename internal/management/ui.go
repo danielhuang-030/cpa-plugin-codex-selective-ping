@@ -159,6 +159,16 @@ func renderRunHistoryList(st StatusResponse, lang Lang, t func(string) string) s
 		b.WriteString(`</div></div>`)
 	}
 	b.WriteString(`</div>`)
+	fmt.Fprintf(&b, `<div class="hist-pager" data-testid="hist-pager">`+
+		`<button type="button" data-hist-prev data-i18n="hist_pager_prev">%s</button>`+
+		`<span data-hist-page-label>1 / 1</span>`+
+		`<button type="button" data-hist-next data-i18n="hist_pager_next">%s</button>`+
+		`<label><span data-i18n="hist_pager_per_page">%s</span>`+
+		`<select data-hist-page-size><option value="10">10</option><option value="20">20</option><option value="50">50</option></select>`+
+		`</label></div>`,
+		html.EscapeString(t("hist_pager_prev")),
+		html.EscapeString(t("hist_pager_next")),
+		html.EscapeString(t("hist_pager_per_page")))
 	return b.String()
 }
 
@@ -638,6 +648,12 @@ func RenderStatusPage(st StatusResponse, lang Lang) string {
   .run-summary .meta { font-size: 12px; opacity: .75; font-family: var(--mono) }
   .hist { display:grid; gap: 8px }
   .hist-item { border:1px solid var(--line); border-radius:14px; background:var(--bg); overflow:hidden }
+  .hist-pager { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:10px; color:var(--ink-soft); font-size:12px }
+  .hist-pager button { border:1px solid var(--line); background:var(--panel-2); color:var(--ink); border-radius:10px; padding:7px 10px; font-size:12px; font-weight:700 }
+  .hist-pager button:disabled { opacity:.55; color:var(--ink-soft); cursor:not-allowed }
+  .hist-pager [data-hist-page-label] { min-width:48px; text-align:center; font-family:var(--mono); font-variant-numeric:tabular-nums }
+  .hist-pager label { display:flex; align-items:center; gap:6px; margin-left:auto; color:var(--ink-soft); font-weight:650 }
+  .hist-pager select { border:1px solid var(--line); background:var(--bg); color:var(--ink); border-radius:10px; padding:7px 8px; font:inherit }
   .hist-head { display:flex; justify-content:space-between; gap:10px; align-items:center; padding:10px 12px; cursor:pointer; width:100%%; border:0; background:transparent; color:inherit; text-align:left; font:inherit }
   .hist-head:hover { background: color-mix(in srgb, var(--accent) 6%%, transparent) }
   .hist-head .left { display:grid; gap:2px }
@@ -1329,6 +1345,65 @@ async function loadModels(){
     if(o && !o.textContent) o.textContent=String(e);
   }
 }
+const HIST_PAGE_SIZE_KEY = 'csp-hist-page-size';
+const HIST_PAGE_SIZES = [10, 20, 50];
+const HIST_PAGE_SIZE_DEFAULT = 10;
+let histPage = 1;
+function readHistPageSize(){
+  try{
+    const n=parseInt(localStorage.getItem(HIST_PAGE_SIZE_KEY)||'',10);
+    if(HIST_PAGE_SIZES.indexOf(n)>=0) return n;
+  }catch(e){}
+  return HIST_PAGE_SIZE_DEFAULT;
+}
+function writeHistPageSize(n){
+  try{ localStorage.setItem(HIST_PAGE_SIZE_KEY,String(n)); }catch(e){}
+}
+function applyHistPage(){
+  const root=document.querySelector('[data-testid="run-history"]');
+  const pager=document.querySelector('[data-testid="hist-pager"]');
+  if(!root || !pager) return;
+  const items=Array.prototype.slice.call(root.querySelectorAll('.hist-item'));
+  const sizeSel=pager.querySelector('[data-hist-page-size]');
+  let size=readHistPageSize();
+  if(sizeSel){
+    sizeSel.value=String(size);
+    size=parseInt(sizeSel.value,10)||HIST_PAGE_SIZE_DEFAULT;
+  }
+  const total=items.length;
+  const pages=Math.max(1,Math.ceil(total/size));
+  if(histPage>pages) histPage=pages;
+  if(histPage<1) histPage=1;
+  const start=(histPage-1)*size;
+  items.forEach(function(el,i){
+    el.style.display=(i>=start && i<start+size) ? '' : 'none';
+  });
+  const label=pager.querySelector('[data-hist-page-label]');
+  if(label) label.textContent=histPage+' / '+pages;
+  const prev=pager.querySelector('[data-hist-prev]');
+  const next=pager.querySelector('[data-hist-next]');
+  if(prev) prev.disabled=histPage<=1;
+  if(next) next.disabled=histPage>=pages;
+}
+function initHistPager(){
+  const pager=document.querySelector('[data-testid="hist-pager"]');
+  if(!pager) return;
+  const sizeSel=pager.querySelector('[data-hist-page-size]');
+  if(sizeSel){
+    sizeSel.value=String(readHistPageSize());
+    sizeSel.addEventListener('change',function(){
+      const n=parseInt(sizeSel.value,10);
+      writeHistPageSize(n);
+      histPage = 1;
+      applyHistPage();
+    });
+  }
+  const prev=pager.querySelector('[data-hist-prev]');
+  const next=pager.querySelector('[data-hist-next]');
+  if(prev) prev.addEventListener('click',function(){ histPage--; applyHistPage(); });
+  if(next) next.addEventListener('click',function(){ histPage++; applyHistPage(); });
+  applyHistPage();
+}
 (function(){
   restoreKeyFromSession();
   const root = document.body;
@@ -1342,6 +1417,7 @@ async function loadModels(){
   }
   loadModels();
 })();
+initHistPager();
 renderTimes();
 </script>
 </body></html>`,
