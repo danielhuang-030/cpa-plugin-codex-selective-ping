@@ -10,7 +10,7 @@
 ## 功能
 
 - **只 ping 白名單** — 依 `accounts`；空陣列 → attempted 為 0
-- **可選模型** — 設定欄位 `model` 可選；空字串／省略 → 後備 `gpt-6-luna`。管理 UI 透過 plugin `GET …/models` 代打載入選項，不再由瀏覽器直打 `GET /v1/models`
+- **可選模型** — 設定欄位 `model` 可選；空字串／省略 → 後備 `gpt-6-luna`。管理 UI 透過 plugin `GET …/models` 代打載入選項（可用「更新模型」；Management Key → `api-keys` → `/v1/models`），不再由瀏覽器直打 `GET /v1/models`
 - **每日排程** — IANA 時區 + 全域 `times`；可選每帳號 `account_times`；CPA 啟動時不會立刻 ping
 - **管理 UI** — 繁中／英文／日文（跟隨 CPA 管理中心；可用 `?lang=` / `?theme=` 覆寫）；每帳號繼承／自訂排程；可展開的依帳號執行歷史
 - **保留上次執行** — `{CPA 根目錄}/data/codex-selective-ping/run_history.json`（不會寫入 `auth-dir` / `auths/`）
@@ -153,7 +153,7 @@ POST       /v0/management/plugins/codex-selective-ping/run
 GET/PATCH  /v0/management/plugins/codex-selective-ping/config
 ```
 
-`GET .../models` 回傳過濾後的 OpenAI 風格 `{data:[{id}]}`（先 Management Key，再第一個 Codex token 代打上游）。上游全失敗仍 **200**，回傳後備 id（已設定的 `model` + `gpt-6-luna`）與 `warning`。
+`GET .../models` 回傳過濾後的 OpenAI 風格 `{data:[{id}]}`（Management Key → `GET /v0/management/api-keys` 取代理 API Key → `/v1/models`；失敗再試第一個 Codex token）。上游全失敗仍 **200**，回傳後備 id（已設定的 `model` + `gpt-6-luna`）與 `warning`。UI「更新模型」在未填 Management Key 時與儲存設定相同，提示需要 Key。
 
 `POST .../run` 回 **202**；若已在執行則 **409**。
 

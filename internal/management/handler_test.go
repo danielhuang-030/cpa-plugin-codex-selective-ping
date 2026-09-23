@@ -288,13 +288,17 @@ func TestStatusJSONEmptyModelFallsBack(t *testing.T) {
 }
 
 func TestModelsEndpointManagementKeyOK(t *testing.T) {
+	keysBody, _ := json.Marshal(map[string]any{"api-keys": []string{"sk-proxy"}})
 	body, _ := json.Marshal(map[string]any{
 		"data": []map[string]any{
 			{"id": "gpt-6-luna", "owned_by": "openai"},
 			{"id": "claude-3", "owned_by": "anthropic"},
 		},
 	})
-	host := &modelsHost{script: []hostapi.HTTPResponse{{StatusCode: 200, Body: body}}}
+	host := &modelsHost{script: []hostapi.HTTPResponse{
+		{StatusCode: 200, Body: keysBody},
+		{StatusCode: 200, Body: body},
+	}}
 	p := plugin.New(host, "0.2.5")
 	p.ApplyConfig(config.Config{Enabled: true, Model: "gpt-6-luna"})
 	defer p.Shutdown()
@@ -321,8 +325,17 @@ func TestModelsEndpointManagementKeyOK(t *testing.T) {
 	if !hasID(ids, "gpt-6-luna") || hasID(ids, "claude-3") {
 		t.Fatalf("ids=%v", ids)
 	}
-	if len(host.calls) != 1 || host.calls[0].URL != "http://cpa.test/v1/models" {
+	if len(host.calls) != 2 {
 		t.Fatalf("calls=%v", host.calls)
+	}
+	if host.calls[0].URL != "http://cpa.test/v0/management/api-keys" {
+		t.Fatalf("keys url=%q", host.calls[0].URL)
+	}
+	if host.calls[1].URL != "http://cpa.test/v1/models" {
+		t.Fatalf("models url=%q", host.calls[1].URL)
+	}
+	if firstHeader(host.calls[1].Headers, "Authorization") != "Bearer sk-proxy" {
+		t.Fatalf("models auth=%q", firstHeader(host.calls[1].Headers, "Authorization"))
 	}
 }
 

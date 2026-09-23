@@ -10,7 +10,7 @@ A [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) (CPA) plugin that 
 ## Features
 
 - **Allowlist only** — pings `accounts`; empty list → 0 attempts
-- **Selectable model** — optional config `model`; empty → fallback `gpt-6-luna`. Management UI loads options via plugin `GET …/models` (proxied), not browser `GET /v1/models`
+- **Selectable model** — optional config `model`; empty → fallback `gpt-6-luna`. Management UI loads options via plugin `GET …/models` (Refresh models button; Management Key → `api-keys` → `/v1/models`), not browser `GET /v1/models`
 - **Daily schedule** — IANA timezone + global `times`; optional per-account `account_times`; does not ping on CPA startup
 - **Management UI** — Traditional Chinese / English / Japanese (follows CPA Management Center; override with `?lang=` / `?theme=`); per-account inherit/custom schedule; expandable run history by account
 - **Persisted last run** — `{CPA root}/data/codex-selective-ping/run_history.json` (never under `auth-dir` / `auths/`)
@@ -155,7 +155,7 @@ POST       /v0/management/plugins/codex-selective-ping/run
 GET/PATCH  /v0/management/plugins/codex-selective-ping/config
 ```
 
-`GET .../models` returns a filtered OpenAI-style `{data:[{id}]}` list (Management Key, then first Codex token upstream). On total upstream failure it still returns **200** with fallback ids (configured `model` + `gpt-6-luna`) and a `warning`.
+`GET .../models` returns a filtered OpenAI-style `{data:[{id}]}` list (Management Key → `GET /v0/management/api-keys` → proxy API key → `/v1/models`; then first Codex token). On total upstream failure it still returns **200** with fallback ids (configured `model` + `gpt-6-luna`) and a `warning`. The Refresh models control prompts for a Management Key the same way Save does when the field is empty.
 
 `POST .../run` returns **202**, or **409** if a run is already in progress.
 

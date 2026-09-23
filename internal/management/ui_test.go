@@ -1223,3 +1223,26 @@ func TestRenderStatusPageSaveCfgIncludesModel(t *testing.T) {
 		t.Fatal("saveCfg must read model from #model-select")
 	}
 }
+
+func TestRenderStatusPageRefreshModelsButton(t *testing.T) {
+	html := RenderStatusPage(StatusResponse{Version: "0.2.7", Model: "gpt-6-luna"}, LangZhHant)
+	for _, want := range []string{
+		`data-testid="refresh-models"`,
+		`id="refresh-models"`,
+		`refreshModels(`,
+		`data-i18n="refresh_models"`,
+		`更新模型`,
+		`/v0/management/plugins/codex-selective-ping/models`,
+	} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("missing %q", want)
+		}
+	}
+	if strings.Contains(html, `fetch('/v1/models'`) || strings.Contains(html, `fetch("/v1/models"`) {
+		t.Fatal("UI must not call /v1/models directly")
+	}
+	// no-key path for button must surface need-key copy
+	if !strings.Contains(html, "msgNeedKey") {
+		t.Fatal("expected msgNeedKey for empty-key handling")
+	}
+}

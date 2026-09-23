@@ -258,3 +258,12 @@ func TestRunPollingI18nKeysPresentInAllLangs(t *testing.T) {
 		t.Fatalf("ja run_polling unexpected: %q", got)
 	}
 }
+
+func TestRefreshModelsI18nKeyPresentInAllLangs(t *testing.T) {
+	for _, lang := range []Lang{LangZhHant, LangEn, LangJa} {
+		got := T(lang, "refresh_models")
+		if got == "refresh_models" || strings.TrimSpace(got) == "" {
+			t.Fatalf("%s missing refresh_models (got %q)", lang, got)
+		}
+	}
+}
