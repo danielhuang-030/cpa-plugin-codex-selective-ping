@@ -6,7 +6,7 @@
       "name": "Codex Selective Ping",
       "description": "Ping only selected Codex OAuth accounts on a daily schedule, with a Traditional Chinese / English / Japanese management UI.",
       "author": "danielhuang-030",
-      "version": "0.2.4",
+      "version": "0.2.5",
       "repository": "https://github.com/danielhuang-030/cpa-plugin-codex-selective-ping",
       "homepage": "https://github.com/danielhuang-030/cpa-plugin-codex-selective-ping",
       "license": "MIT",
